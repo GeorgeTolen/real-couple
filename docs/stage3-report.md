@@ -30,7 +30,7 @@ $env:PYTHONUTF8=1
 |---|---|---|
 | Тесты, сеть не нужна | `..\.venv\Scripts\python -m pytest -q` | `84 passed` |
 | Эталон зафиксирован до прогона | `git log --format="%h %cI %s" -- bench/holdout/gt_holdout.json` | Коммит `9306938`, отчёт о прогоне появляется только в следующих коммитах |
-| Секреты в истории | `git log --all -p -S "sk-or-v1" --format=%h` | Пусто |
+| Ключ в истории | `git log --all -p -G "sk-or-v1-[0-9a-f]{8}" --format=%h` | Пусто |
 | Лишние файлы в истории | `git log --all --name-only --format= \| Select-String "sqlite\|data/audio\|data/whisper"` | Пусто |
 
 В базе чистого клона данных нет. Проверки `validate` и интерфейса требуют `make import` и оценки, то есть ключа и денег. Сам файл результатов можно прочитать сразу, а его формат и пересчёт проверяет тест и команда `validate` при наличии импорта.
