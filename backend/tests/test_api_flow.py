@@ -113,7 +113,15 @@ def test_full_flow(client, fake_llm, dev_records):
     payload = client.get("/api/export/results-json", params={"set": "dev"}).json()
     assert payload["problems"] == []
     row = next(r for r in payload["document"]["results"] if r["conversation_id"] == ids[0])
-    assert row["score"]["final_score"] == result["final"]["total"]
+    # В файл для сдачи идёт ответ модели, решение проверяющего не подменяет его.
+    assert row["score"]["final_score"] == original_total
+    empathy_row = next(c for c in row["criteria"] if c["criterion_id"] == "empathy")
+    assert empathy_row["value"] is False
+    with_decisions = client.get(
+        "/api/export/results-json", params={"set": "dev", "with_decisions": True}
+    ).json()["document"]
+    reviewed = next(r for r in with_decisions["results"] if r["conversation_id"] == ids[0])
+    assert reviewed["score"]["final_score"] == result["final"]["total"]
     assert export.validate_results(payload["document"], 2) == []
 
     stats = client.get("/api/stats").json()

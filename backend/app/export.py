@@ -97,7 +97,12 @@ def build_results(
     version: int | None = None,
     allow_partial: bool = False,
     limit: int | None = None,
+    with_decisions: bool = False,
 ) -> dict[str, Any]:
+    """По умолчанию в файл идут ответы модели: организаторы сравнивают с эталоном работу системы.
+
+    Решения проверяющих, в том числе тестовые на демо, добавляются только по with_decisions.
+    """
     if version is None:
         version = latest_exportable_version(checklist_id)
     checklist = repo.get_checklist(checklist_id, version)
@@ -137,7 +142,8 @@ def build_results(
             if model not in names:
                 names.append(model)
         criteria = []
-        by_code = {codes[c["criterion_id"]]: c for c in view["final"]["criteria"] if c["criterion_id"] in codes}
+        layer = view["final"] if with_decisions else view["original"]
+        by_code = {codes[c["criterion_id"]]: c for c in layer["criteria"] if c["criterion_id"] in codes}
         for code in REQUIRED_CRITERIA:
             item = by_code[code]
             criteria.append(
@@ -154,7 +160,7 @@ def build_results(
                 "conversation_id": conversation_id,
                 "status": "ok",
                 "criteria": criteria,
-                "score": {"final_score": view["final"]["total"], "critical_flag": critical},
+                "score": {"final_score": layer["total"], "critical_flag": critical},
             }
         )
     if unevaluated and not allow_partial:

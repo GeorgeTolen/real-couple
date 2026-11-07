@@ -9,12 +9,17 @@ from .. import export, repo
 router = APIRouter()
 
 
-def _build(set_name: str, group_id: str | None, checklist_id: str, version: int | None, allow_partial: bool):
+def _build(
+    set_name: str, group_id: str | None, checklist_id: str, version: int | None, allow_partial: bool,
+    with_decisions: bool = False,
+):
     export.results_path(set_name)
     group = group_id or ("DEV" if set_name == "dev" else None)
     if not group:
         raise export.ExportError("Для набора prod укажите group_id")
-    doc = export.build_results(group, checklist_id, version, allow_partial=allow_partial)
+    doc = export.build_results(
+        group, checklist_id, version, allow_partial=allow_partial, with_decisions=with_decisions
+    )
     problems = export.validate_results(doc, None if allow_partial else len(repo.group_conversation_ids(group)))
     if not problems:
         used = version or export.latest_exportable_version(checklist_id)
@@ -25,9 +30,9 @@ def _build(set_name: str, group_id: str | None, checklist_id: str, version: int 
 @router.get("/export/results-json")
 def preview_results(
     set: str = "dev", group_id: str | None = None, checklist_id: str = "freedom-default",
-    version: int | None = None, allow_partial: bool = False,
+    version: int | None = None, allow_partial: bool = False, with_decisions: bool = False,
 ):
-    doc, problems = _build(set, group_id, checklist_id, version, allow_partial)
+    doc, problems = _build(set, group_id, checklist_id, version, allow_partial, with_decisions)
     return {"problems": problems, "document": doc}
 
 

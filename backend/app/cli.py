@@ -263,7 +263,7 @@ def cmd_bench(args) -> int:
 def _export(args, set_name: str, group: str) -> dict[str, Any]:
     doc = export.build_results(
         group, args.checklist, args.version, allow_partial=getattr(args, "allow_partial", False),
-        limit=getattr(args, "limit", None),
+        limit=getattr(args, "limit", None), with_decisions=getattr(args, "with_decisions", False),
     )
     return doc
 
@@ -424,6 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--checklist", default=DEFAULT_CHECKLIST)
     p.add_argument("--version", type=int)
     p.add_argument("--allow-partial", action="store_true")
+    p.add_argument("--with-decisions", action="store_true")
     p.set_defaults(func=cmd_export)
 
     p = sub.add_parser("validate")
