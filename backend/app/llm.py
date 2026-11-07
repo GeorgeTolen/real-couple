@@ -210,6 +210,7 @@ async def chat_json(
                 )
             except httpx.HTTPError as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
+                log.warning("%s: %s, попытка %d", model, last_error, attempt)
                 await asyncio.sleep(2**attempt)
                 continue
 
