@@ -66,6 +66,38 @@ def _aggregate(rows: list[tuple[Decimal, Decimal]]) -> tuple[Decimal, Decimal]:
     return sum((w * f for w, f in rows), Decimal(0)), sum((w for w, _ in rows), Decimal(0))
 
 
+# Ось карты по умолчанию задана кодом критерия организаторов: файл чек-листа менять не нужно.
+DEFAULT_AXIS = {
+    "discovery": "resolution", "identification": "resolution", "consultation": "resolution",
+    "contact": "service", "empathy": "service", "dialogue": "service", "closure": "service",
+}
+
+
+def criterion_axis(criterion: Criterion) -> str | None:
+    if criterion.type == "flag":
+        return None
+    return criterion.map_axis or DEFAULT_AXIS.get(criterion.export_id or "")
+
+
+def axis_scores(
+    checklist: Checklist, answers: dict[str, str], channel: str | None = None
+) -> dict[str, float | None]:
+    """Положение на карте: взвешенная доля по критериям оси, как в итоге. N/A исключается."""
+    rows: dict[str, list[tuple[Decimal, Decimal]]] = {"resolution": [], "service": []}
+    for crit in criteria_for_channel(checklist, channel):
+        axis = criterion_axis(crit)
+        if axis is None or crit.weight <= 0 or crit.id not in answers:
+            continue
+        fraction = criterion_fraction(crit, answers[crit.id])
+        if fraction is not None:
+            rows[axis].append((Decimal(str(crit.weight)), fraction))
+    result: dict[str, float | None] = {}
+    for axis, items in rows.items():
+        earned, weight = _aggregate(items)
+        result[axis] = round2(earned / weight * 100) if weight > 0 else None
+    return result
+
+
 def compute_totals(
     checklist: Checklist, answers: dict[str, str], channel: str | None = None
 ) -> dict[str, Any]:

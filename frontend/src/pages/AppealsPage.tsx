@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Field, Input, Select, Tab, TabList, Textarea } from '@fluentui/react-components'
 import { Link } from 'react-router-dom'
-import { api, type Appeal } from '../api'
+import { api, type Appeal, type Evaluation } from '../api'
 import { useRole } from '../App'
-import { AgreementDots, AnswerBadge, ErrorBox, Loading, Segments } from '../components/common'
+import { AgreementDots, AnswerBadge, EmptyState, ErrorBox, Loading, Segments } from '../components/common'
+import QualityOctagon from '../components/QualityOctagon'
 import { CHANNEL, SPEAKER, answerLabel, dateTime, points, score } from '../format'
 
 const REASON_LIMIT = 300
 
-function DecisionForm({ appeal, onSaved }: { appeal: Appeal; onSaved: () => void }) {
+function DecisionForm({ appeal, evaluation, onSaved }: { appeal: Appeal; evaluation: Evaluation | null; onSaved: () => void }) {
   const criterion = appeal.original_criterion
   const options = criterion.allowed_answers.filter((a) => a !== criterion.answer)
   const [action, setAction] = useState<'confirm' | 'change'>('change')
@@ -46,8 +47,10 @@ function DecisionForm({ appeal, onSaved }: { appeal: Appeal; onSaved: () => void
   }
 
   return (
-    <div className="card pad stack">
+    <div className="card pad">
       <h2>Решение</h2>
+      <div className="decision-grid pad-text">
+      <div className="stack">
       <div className="row wrap">
         <Segments
           value={action}
@@ -76,10 +79,10 @@ function DecisionForm({ appeal, onSaved }: { appeal: Appeal; onSaved: () => void
         <Input value={reviewer} onChange={(_, data) => setReviewer(data.value)} />
       </Field>
       <ErrorBox message={error} />
-      <div className="row" style={{ justifyContent: 'space-between' }}>
+      <div className="row between">
         <div>
-          <span className="muted">Пересчёт баллов: </span>
-          <b className="mono" style={{ fontSize: 18 }}>
+          <span className="muted">Итог: </span>
+          <b className="mono" style={{ fontSize: 20 }} data-testid="recount">
             {action === 'confirm' || !preview
               ? score(appeal.final_total)
               : `${score(preview.before)} → ${score(preview.after)}`}
@@ -89,12 +92,37 @@ function DecisionForm({ appeal, onSaved }: { appeal: Appeal; onSaved: () => void
           Сохранить решение
         </Button>
       </div>
+      </div>
+      {evaluation?.final && (
+        <div data-testid="appeal-octagon">
+          <QualityOctagon
+            compact
+            items={evaluation.final.criteria}
+            total={action === 'change' && preview ? preview.after : appeal.final_total}
+            overlay={action === 'change' ? { [appeal.criterion_id]: answer } : {}}
+            label={`Было пунктиром, стало заливкой: ${appeal.original_criterion.title}`}
+          />
+          <div className="small muted right">Пунктир: было. Заливка: станет.</div>
+        </div>
+      )}
+      </div>
     </div>
   )
 }
 
 function Detail({ appeal, onSaved }: { appeal: Appeal; onSaved: () => void }) {
   const role = useRole()
+  const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
+  useEffect(() => {
+    let live = true
+    api.evaluation(appeal.evaluation_id)
+      .then((data) => { if (live) setEvaluation(data) })
+      .catch(() => { if (live) setEvaluation(null) })
+    return () => { live = false }
+  }, [appeal.evaluation_id, appeal.status])
+  const finalAnswers = evaluation?.final
+    ? Object.fromEntries(evaluation.final.criteria.map((c) => [c.criterion_id, c.answer]))
+    : {}
   const criterion = appeal.original_criterion
   const evidence = new Set(criterion.evidence_ids)
   return (
@@ -139,14 +167,24 @@ function Detail({ appeal, onSaved }: { appeal: Appeal; onSaved: () => void }) {
         </div>
       </div>
 
-      {appeal.status === 'open' && role === 'reviewer' && <DecisionForm key={appeal.id} appeal={appeal} onSaved={onSaved} />}
+      {appeal.status === 'open' && role === 'reviewer' && <DecisionForm key={appeal.id} appeal={appeal} evaluation={evaluation} onSaved={onSaved} />}
       {appeal.status === 'open' && role !== 'reviewer' && (
         <div className="notice">Решение принимает проверяющий. Переключите роль в верхней панели.</div>
       )}
 
+      {appeal.status !== 'open' && evaluation?.original && (
+        <div className="card pad">
+          <h2>Было и стало: итог {score(appeal.original_total)} → {score(appeal.final_total)}</h2>
+          <div className="pad-text" data-testid="appeal-octagon" style={{ maxWidth: 320 }}>
+            <QualityOctagon compact items={evaluation.original.criteria} total={appeal.final_total} overlay={finalAnswers} />
+            <div className="small muted">Пунктир: было. Заливка: стало.</div>
+          </div>
+        </div>
+      )}
+
       <div className="card pad stack">
         <h2>История</h2>
-        <div className="timeline-log">
+        <div className="timeline-log pad-text">
           <div>
             <i className="dot" style={{ background: 'var(--accent)' }} />
             <span className="badge yes">Оценка</span>
@@ -214,7 +252,12 @@ export default function AppealsPage() {
             <Tab value="resolved">Закрытые</Tab>
           </TabList>
           {items === null ? <Loading /> : !items.length ? (
-            <div className="card empty">{tab === 'open' ? 'Открытых апелляций нет.' : 'Закрытых апелляций нет.'}</div>
+            <EmptyState
+              coins={false}
+              title={tab === 'open' ? 'Открытых апелляций нет' : 'Закрытых апелляций нет'}
+              hint="Апелляция подаётся из карточки диалога кнопкой «Оспорить критерий»."
+              action={<Link to="/">Открыть журнал диалогов</Link>}
+            />
           ) : items.map((appeal) => (
             <button
               key={appeal.id}
@@ -239,7 +282,7 @@ export default function AppealsPage() {
         <div style={{ overflow: 'auto', minHeight: 0 }}>
           {selected
             ? <Detail appeal={selected} onSaved={() => { void load() }} />
-            : <div className="card empty">Выберите апелляцию в списке.</div>}
+            : <div className="card empty">Выберите апелляцию в списке слева.</div>}
         </div>
       </div>
     </main>

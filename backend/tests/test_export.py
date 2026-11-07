@@ -349,7 +349,7 @@ async def test_driver_reason_keeps_failure_and_points_to_it(database, sample_rec
         },
     ]
     drivers = repo.score_drivers(criteria)
-    assert len(drivers) == 1 and "сбой" in drivers[0]["reason"]
+    assert len(drivers) == 1 and drivers[0]["reason"].startswith("Однако допущен сбой")
     assert drivers[0]["turn"] == 16
 
 

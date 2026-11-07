@@ -35,6 +35,34 @@ export type CriterionResult = {
   decision_reason?: string | null
   original_answer?: string
   category?: string | null
+  description?: string
+  export_id?: string | null
+}
+
+export type MapItem = {
+  id: string
+  operator: string | null
+  channel: string
+  language: string
+  total: number | null
+  x: number | null
+  y: number | null
+  gross: boolean
+  needs_review: boolean
+}
+
+export type BenchmarkEntry = {
+  accuracy: number | null
+  mae: number | null
+  cost_per_dialog: number | null
+  dialogs: number | null
+  measured_at: string | null
+  stability: number | null
+}
+
+export type Benchmark = {
+  modes: Record<string, BenchmarkEntry | null>
+  holdout: BenchmarkEntry | null
 }
 
 export type EvaluationDiff = {
@@ -197,6 +225,7 @@ export type ChecklistCriterion = {
   channel_overrides: Record<string, { description?: string; guidance?: string }>
   guidance: string | null
   export_id: string | null
+  map_axis?: 'resolution' | 'service' | null
 }
 
 export type Checklist = {
@@ -282,6 +311,8 @@ export type SpeechMetrics = {
 }
 
 export type Stats = {
+  channels?: Record<string, number>
+  languages?: Record<string, number>
   checklist_version: number | null
   evaluated: number
   total_conversations: number
@@ -434,6 +465,13 @@ export const api = {
   cancelJob: (id: number) => post<Job>(`/jobs/${id}/cancel`),
   models: () => request<ModelsInfo>('/models'),
   stats: (params: Record<string, string | number | undefined>) => request<Stats>(`/stats${query(params)}`),
+  analyticsMap: (params: Record<string, string | number | null | undefined>) =>
+    request<{ version: number | null; items: MapItem[] }>(`/analytics/map${query(params)}`),
+  distribution: (params: Record<string, string | number | null | undefined>) =>
+    request<{ version: number | null; n: number; median: number | null; scores: { id: string; total: number }[] }>(
+      `/analytics/distribution${query(params)}`,
+    ),
+  benchmark: () => request<Benchmark>('/analytics/benchmark'),
   previewResults: (params: Record<string, string | number | boolean | undefined>) =>
     request<ResultsPreview>(`/export/results-json${query(params)}`),
   writeResults: (params: Record<string, string | number | undefined>) =>

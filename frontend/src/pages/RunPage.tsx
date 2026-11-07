@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Button, Checkbox, Field, Input, ProgressBar, Radio, RadioGroup, Select, Spinner,
 } from '@fluentui/react-components'
@@ -7,9 +7,10 @@ import {
 } from '@fluentui/react-icons'
 import { Link, useLocation } from 'react-router-dom'
 import { api, type ChecklistListItem, type Job, type Measurement, type ModelsInfo, type ResultsPreview } from '../api'
-import { ErrorBox, Segments } from '../components/common'
+import { EmptyState, ErrorBox, Segments } from '../components/common'
 import { CHANNEL, MODE, clock, money, score } from '../format'
 
+const TengeCoins = lazy(() => import('../components/TengeCoins'))
 const ACTIVE = ['queued', 'running']
 const JOB_STATUS: Record<string, string> = {
   queued: 'В очереди', running: 'Оценка в процессе', finished: 'Завершена', cancelled: 'Остановлена',
@@ -62,7 +63,7 @@ function ExportPanel({ checklistId, version, group }: { checklistId: string; ver
           options={[{ value: 'dev', label: 'results/dev' }, { value: 'prod', label: 'results/prod' }]}
         />
         <Button disabled={busy} onClick={check}>Проверить</Button>
-        <Button appearance="primary" disabled={busy} onClick={write}>Записать файл</Button>
+        <Button disabled={busy} onClick={write}>Записать файл</Button>
       </div>
       <ErrorBox message={error} />
       {message && <div className="success">{message}</div>}
@@ -106,6 +107,7 @@ export default function RunPage() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [watched, setWatched] = useState(false)
   const pollTimer = useRef<number | undefined>(undefined)
 
   const refreshGroups = useCallback(() => api.datasets().then(setGroups).catch(() => setGroups([])), [])
@@ -138,6 +140,10 @@ export default function RunPage() {
   const price = models?.modes[mode]?.cost_per_dialog
   const entry = checklists.find((c) => c.id === checklistId)
   const running = job !== null && ACTIVE.includes(job.status)
+  useEffect(() => {
+    if (running) setWatched(true)
+  }, [running])
+  const justFinished = watched && job !== null && !running
 
   const importData = async () => {
     setBusy(true); setError(null); setNotice(null)
@@ -315,8 +321,18 @@ export default function RunPage() {
 
         <div className="stack lg">
           <div className="card pad">
-            {!job ? <div className="empty">Задач ещё не было.</div> : (
+            {!job ? (
+              <EmptyState
+                title="Задач ещё не было"
+                hint="Выберите набор и режим слева, затем нажмите «Запустить оценку»."
+              />
+            ) : (
               <>
+                {(running || justFinished) && (
+                  <Suspense fallback={null}>
+                    <TengeCoins progress={job.total ? job.done / job.total : 0} settled={!running} />
+                  </Suspense>
+                )}
                 <div className="row" style={{ justifyContent: 'space-between' }}>
                   <div className="row">
                     <h2>Задача {job.id}</h2>
@@ -333,8 +349,8 @@ export default function RunPage() {
                 <div className="small muted">
                   Чек-лист {job.params.checklist_id}, версия {job.params.version} · {MODE[job.params.mode] ?? job.params.mode}
                 </div>
-                <div className="row" style={{ marginTop: 10 }}>
-                  <ProgressBar className="grow" value={job.total ? job.done / job.total : 0} thickness="large" />
+                <div className="row" style={{ marginTop: 8 }}>
+                  <ProgressBar className="grow" aria-label="Прогресс оценки" value={job.total ? job.done / job.total : 0} thickness="large" />
                   <span className="mono">{job.done} из {job.total}</span>
                 </div>
                 <div className="counters">

@@ -8,8 +8,9 @@ import {
 } from '@fluentui/react-icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type ConversationRow } from '../api'
-import { ErrorBox, Loading, Segments } from '../components/common'
-import { CHANNEL, STATUS, answerTone, clock, dateTime, score } from '../format'
+import { EmptyState, ErrorBox, Loading, Segments } from '../components/common'
+import KpiStrip from '../components/KpiStrip'
+import { CHANNEL, STATUS, answerLabel, answerTone, clock, dateTime, score } from '../format'
 
 const PAGE_SIZE = 20
 const LANGUAGES = ['RU', 'KZ', 'EN']
@@ -63,7 +64,12 @@ function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () =>
 
 export default function ConversationsPage() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
+  const scoreParam = params.get('score')
+  const scoreRange = useMemo(() => {
+    const match = scoreParam?.match(/^(\d+)-(\d+)$/)
+    return match ? [Number(match[1]), Number(match[2])] : null
+  }, [scoreParam])
   const [rows, setRows] = useState<ConversationRow[] | null>(null)
   const [groups, setGroups] = useState<{ group_id: string; total: number }[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -108,30 +114,31 @@ export default function ConversationsPage() {
       if (channel !== 'all' && row.channel !== channel) return false
       if (languages.length && !languages.includes(row.language)) return false
       if (onlyReview && !row.evaluation?.needs_review) return false
+      if (scoreRange) {
+        const total = row.evaluation?.final_total
+        if (typeof total !== 'number' || total < scoreRange[0]) return false
+        if (scoreRange[1] === 100 ? total > 100 : total >= scoreRange[1]) return false
+      }
       return true
     })
-  }, [rows, channel, languages, onlyReview])
+  }, [rows, channel, languages, onlyReview, scoreRange])
 
-  useEffect(() => setPage(0), [channel, languages, onlyReview, q, group, status])
+  useEffect(() => setPage(0), [channel, languages, onlyReview, q, group, status, scoreRange])
 
+  const filtersActive = Boolean(
+    q || group || status || channel !== 'all' || languages.length || onlyReview || scoreRange,
+  )
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const shown = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const evaluated = visible.filter((r) => r.evaluation?.status === 'ok')
-  const scores = evaluated.map((r) => r.evaluation?.final_total).filter((v): v is number => typeof v === 'number')
-  const average = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
 
   const toggle = (id: string) =>
     setSelected((items) => (items.includes(id) ? items.filter((i) => i !== id) : [...items, id]))
 
   return (
     <main className="content">
+      <KpiStrip />
       <div className="page-head">
-        <div className="metrics">
-          <div>Оценено<b>{evaluated.length} из {visible.length}</b></div>
-          <div>Средний балл<b>{score(average)}</b></div>
-          <div>На проверку<b style={{ color: 'var(--mid)' }}>{evaluated.filter((r) => r.evaluation?.needs_review).length}</b></div>
-          <div>Грубые нарушения<b style={{ color: 'var(--no)' }}>{evaluated.filter((r) => r.evaluation?.gross_violation).length}</b></div>
-        </div>
+        <h1>Журнал диалогов</h1>
         <div className="row">
           <Button icon={<ArrowDownload20Regular />} onClick={() => setImporting(true)}>Импорт из API</Button>
           <Button
@@ -184,15 +191,43 @@ export default function ConversationsPage() {
           {groups.map((g) => <option key={g.group_id} value={g.group_id}>{g.group_id} ({g.total})</option>)}
         </Select>
         <Switch label="Только на проверку" checked={onlyReview} onChange={(_, data) => setOnlyReview(data.checked)} />
+        {scoreRange && (
+          <span className="score-filter" data-testid="score-filter">
+            <span className="badge plain mono">баллы {scoreRange[0]}..{scoreRange[1]}</span>
+            <Button size="small" appearance="subtle" onClick={() => setParams({})}>Сбросить</Button>
+          </span>
+        )}
       </div>
 
       <ErrorBox message={error} />
       {rows === null ? <Loading /> : !visible.length ? (
-        <div className="card empty">
-          {rows.length
-            ? 'По этим фильтрам диалогов нет.'
-            : 'Диалогов пока нет. Импортируйте набор из API организаторов.'}
-        </div>
+        filtersActive ? (
+          <EmptyState
+            title="По этим фильтрам диалогов нет"
+            hint="Снимите часть фильтров или измените поиск."
+            action={
+              <Button
+                onClick={() => {
+                  setQ('')
+                  setChannel('all')
+                  setLanguages([])
+                  setStatus('')
+                  setGroup('')
+                  setOnlyReview(false)
+                  setParams({})
+                }}
+              >
+                Сбросить фильтры
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Диалогов пока нет"
+            hint="Импортируйте набор из API организаторов, затем запустите оценку."
+            action={<Button onClick={() => setImporting(true)}>Импорт из API</Button>}
+          />
+        )
       ) : (
         <div className="table-wrap">
           <table className="grid">
@@ -200,11 +235,9 @@ export default function ConversationsPage() {
               <tr>
                 <th style={{ width: 36 }} />
                 <th>ID диалога</th>
-                <th>Канал</th>
-                <th>Язык</th>
                 <th>Оператор</th>
-                <th>Дата и длительность</th>
-                <th className="right">Итоговый балл</th>
+                <th>Канал и язык</th>
+                <th className="right">Итог</th>
                 <th>Критерии</th>
                 <th>Флаги</th>
                 <th>Апелляция</th>
@@ -229,15 +262,16 @@ export default function ConversationsPage() {
                     </td>
                     <td className="mono"><b>{row.id}</b></td>
                     <td>
-                      <span className="row">
-                        {row.channel === 'voice call' ? <Call20Regular /> : <Chat20Regular />}
-                        {CHANNEL[row.channel] ?? row.channel}
-                      </span>
+                      {row.operator ?? <span className="muted">Не определён</span>}
+                      <div className="mono small muted">
+                        {row.started_at ? `${dateTime(row.started_at)} · ` : ''}{clock(row.duration_sec)}
+                      </div>
                     </td>
-                    <td>{row.language}</td>
-                    <td>{row.operator ?? <span className="muted">Не определён</span>}</td>
-                    <td className="mono small">
-                      {row.started_at ? `${dateTime(row.started_at)} · ` : ''}{clock(row.duration_sec)}
+                    <td>
+                      <span className="row">
+                        {row.channel === 'voice call' ? <Call20Regular aria-hidden /> : <Chat20Regular aria-hidden />}
+                        {CHANNEL[row.channel] ?? row.channel} · {row.language}
+                      </span>
                     </td>
                     <td className="score-cell">
                       {evaluation?.status === 'error' ? (
@@ -253,7 +287,9 @@ export default function ConversationsPage() {
                           <i
                             key={c.criterion_id}
                             className={`fill-${answerTone(c, c.answer)}`}
-                            title={`${c.title}: ${c.answer}`}
+                            title={`${c.title}: ${answerLabel(c.answer)}`}
+                            aria-label={`${c.title}: ${answerLabel(c.answer)}`}
+                            role="img"
                           />
                         ))}
                       </div>

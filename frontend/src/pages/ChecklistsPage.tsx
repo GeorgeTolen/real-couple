@@ -7,6 +7,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type Checklist, type ChecklistCriterion, type ChecklistListItem } from '../api'
 import { ErrorBox, Loading } from '../components/common'
+import QualityOctagon from '../components/QualityOctagon'
 import { dateTime, points, score } from '../format'
 
 const VOICE = 'voice call'
@@ -187,6 +188,16 @@ function CriterionEditor({ draft, criterion, onChange, onClose, onDelete }: {
           </Select>
         </Field>
       </div>
+      <Field label="Ось карты диалогов" hint="Пусто: по коду критерия. На оценку модели не влияет">
+        <Select
+          value={criterion.map_axis ?? ''}
+          onChange={(_, data) => update({ map_axis: (data.value || null) as ChecklistCriterion['map_axis'] })}
+        >
+          <option value="">По умолчанию</option>
+          <option value="resolution">Решение вопроса</option>
+          <option value="service">Сервис</option>
+        </Select>
+      </Field>
       <Field label="Код для results.json" hint="Нужен, чтобы версию можно было сдать организаторам">
         <Select
           value={criterion.export_id ?? ''}
@@ -271,7 +282,7 @@ export default function ChecklistsPage() {
       criteria: [...draft.criteria, {
         id, section: draft.sections[0].id, title: 'Новый критерий', type: 'binary', allow_na: false, weight: 10,
         description: '', na_condition: null, scale: null, channels: null, channel_overrides: {}, guidance: null,
-        export_id: null,
+        export_id: null, map_axis: null,
       }],
     })
     setSelected(id)
@@ -337,7 +348,7 @@ export default function ChecklistsPage() {
       <div className="editor">
         <div className="card pad stack">
           <h2>Чек-листы</h2>
-          <Button appearance="primary" icon={<Add20Regular />} onClick={() => setCreating(!creating)}>Новый чек-лист</Button>
+          <Button icon={<Add20Regular />} onClick={() => setCreating(!creating)}>Новый чек-лист</Button>
           {creating && (
             <div className="stack">
               <Field label="Идентификатор" hint="Латиница, например my-list">
@@ -439,6 +450,23 @@ export default function ChecklistsPage() {
               </div>
             )}
           </div>
+          <div className="card pad">
+            <h3>Предпросмотр профиля</h3>
+            <div className="preview-grid pad-text" data-testid="checklist-preview">
+              <QualityOctagon
+                compact
+                items={draft.criteria.map((c) => ({
+                  criterion_id: c.id, title: c.title, type: c.type, scale: c.scale ?? [], weight: c.weight,
+                }))}
+                center={<text className="oct-center" x={320} y={332} textAnchor="middle">{draft.criteria.length}</text>}
+                label={`Схема чек-листа: критериев ${draft.criteria.length}`}
+              />
+              <div className="stack small muted">
+                <span>Вершин столько же, сколько критериев. Схема перестраивается при добавлении критерия.</span>
+                <span>В карточке диалога вершины покажут ответ модели по каждому критерию.</span>
+              </div>
+            </div>
+          </div>
           <div className="card pad stack">
             <h3>Примеры оценок по этой версии</h3>
             {examples.length ? examples.map((row) => (
@@ -446,8 +474,8 @@ export default function ChecklistsPage() {
                 <Link className="mono" to={`/conversations/${row.conversation_id}`}>{row.conversation_id}</Link>
                 <span className="mono"><b>{score(row.total_score)}</b></span>
               </div>
-            )) : <span className="muted">Этой версией диалоги ещё не оценивались.</span>}
-            <div className="small muted">
+            )) : <span className="muted pad-text">Этой версией диалоги ещё не оценивались.</span>}
+            <div className="small muted pad-text">
               Создана: {dateTime(entry?.versions.find((v) => v.version === active.version)?.created_at)}
             </div>
           </div>

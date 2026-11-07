@@ -262,6 +262,7 @@ def _view(row, rows: list[dict[str, Any]], appeals: list[dict[str, Any]]) -> dic
         criteria_view.append(
             {
                 "criterion_id": criterion.id, "title": criterion.title, "section": criterion.section,
+                "description": criterion.description, "export_id": criterion.export_id,
                 "type": criterion.type, "scale": [s.model_dump() for s in criterion.scale or []],
                 "allow_na": criterion.allow_na, "allowed_answers": allowed_answers(criterion),
                 "weight": result["weight"], "answer": result["answer"],
@@ -308,17 +309,23 @@ def _view(row, rows: list[dict[str, Any]], appeals: list[dict[str, Any]]) -> dic
     }
 
 
-def _failure_turn(reasoning: str, evidence: list[int]) -> int | None:
-    """Реплика со сбоем: первый номер в последнем предложении, где есть ссылка на реплику."""
+def _failure_sentence(reasoning: str) -> str | None:
+    """Модель сначала пишет, что хорошо, а сбой называет в конце: это последнее предложение со ссылкой."""
     for sentence in reversed(re.split(r"(?<=[.!?])\s+", reasoning or "")):
-        found = re.findall(r"#(\d+)", sentence)
-        if found:
-            return int(found[0])
+        if re.search(r"#\d+", sentence):
+            return sentence
+    return None
+
+
+def _failure_turn(reasoning: str, evidence: list[int]) -> int | None:
+    found = re.findall(r"#(\d+)", _failure_sentence(reasoning) or "")
+    if found:
+        return int(found[0])
     return evidence[0] if evidence else None
 
 
 def score_drivers(criteria: list[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
-    """Критерии, снизившие итог из-за конкретного сбоя. Причина это текст reasoning целиком."""
+    """Критерии, снизившие итог из-за конкретного сбоя. Причина взята из reasoning, она не генерируется."""
     lost = []
     for item in criteria:
         if item["max_points"] is None or item["earned_points"] is None:
@@ -329,7 +336,7 @@ def score_drivers(criteria: list[dict[str, Any]], limit: int = 3) -> list[dict[s
             lost.append(
                 {
                     "criterion_id": item["criterion_id"], "title": item["title"], "lost_points": points,
-                    "reason": item.get("decision_reason") or item["reasoning"],
+                    "reason": item.get("decision_reason") or _failure_sentence(item["reasoning"]) or item["reasoning"],
                     "turn": _failure_turn(item["reasoning"], item["evidence_ids"]),
                 }
             )
@@ -414,7 +421,9 @@ def gross_reasons(criteria: list[dict[str, Any]], turns: list[dict]) -> list[dic
 
 def semantic_key(criterion: Criterion) -> str:
     """То, что видит модель. Вес и код сдачи на ответ модели не влияют."""
-    return criterion.model_dump_json(exclude={"weight", "export_id", "section", "channel_overrides"})
+    return criterion.model_dump_json(
+        exclude={"weight", "export_id", "section", "channel_overrides", "map_axis"}
+    )
 
 
 def reusable_results(

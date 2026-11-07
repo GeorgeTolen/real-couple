@@ -11,7 +11,7 @@ from . import repo
 from .config import FRONTEND_DIST
 from .db import init_db, mark_interrupted_jobs
 from .llm import LLMError
-from .routers import appeals, checklists, conversations, evaluations, export, jobs, models, stats
+from .routers import analytics, appeals, checklists, conversations, evaluations, export, jobs, models, stats
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -53,7 +53,7 @@ def health():
     return {"status": "ok"}
 
 
-for module in (conversations, checklists, evaluations, appeals, jobs, export, models, stats):
+for module in (analytics, conversations, checklists, evaluations, appeals, jobs, export, models, stats):
     app.include_router(module.router, prefix="/api")
 
 if (FRONTEND_DIST / "index.html").exists():

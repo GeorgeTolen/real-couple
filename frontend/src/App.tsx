@@ -4,7 +4,8 @@ import {
   ChatMultiple24Regular, ClipboardTaskListLtr24Regular, DataBarVertical24Regular, Flag24Regular,
   Play24Regular, Search20Regular, ShieldError24Regular,
 } from '@fluentui/react-icons'
-import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { EmptyState } from './components/common'
 import { readStorage, writeStorage } from './format'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AppealsPage from './pages/AppealsPage'
@@ -35,6 +36,7 @@ function crumbs(path: string): string[] {
   if (path.startsWith('/checklists')) return ['Настройка', 'Чек-листы']
   if (path.startsWith('/appeals')) return ['Контроль качества', 'Апелляции']
   if (path.startsWith('/analytics')) return ['Аналитика', 'Аналитика качества']
+  if (path !== '/') return ['Контроль качества', 'Страница не найдена']
   return ['Контроль качества', 'Журнал диалогов']
 }
 
@@ -105,6 +107,18 @@ export default function App() {
           <Route path="/checklists" element={<ChecklistsPage />} />
           <Route path="/appeals" element={<AppealsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route
+            path="*"
+            element={
+              <main className="content">
+                <EmptyState
+                  title="Такой страницы нет"
+                  hint="Проверьте адрес или вернитесь к журналу диалогов."
+                  action={<Link to="/" style={{ color: '#fff' }}>Открыть журнал диалогов</Link>}
+                />
+              </main>
+            }
+          />
         </Routes>
       </div>
     </RoleContext.Provider>

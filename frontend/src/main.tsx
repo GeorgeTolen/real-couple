@@ -13,6 +13,10 @@ const freedomGreen: BrandVariants = {
 
 const theme = {
   ...createLightTheme(freedomGreen),
+  // Белый текст на #138a4e даёт меньше 4,5:1, поэтому фон кнопок темнее акцента.
+  colorBrandBackground: '#0e6b3c',
+  colorBrandBackgroundHover: '#0e5932',
+  colorBrandBackgroundPressed: '#0c4728',
   fontFamilyBase: "'Segoe UI Variable', 'Segoe UI', Inter, system-ui, sans-serif",
 }
 

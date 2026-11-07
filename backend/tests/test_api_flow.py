@@ -229,3 +229,40 @@ def test_gross_filter_returns_reasons(client, fake_llm, sample_records):
     rows = client.get("/api/conversations", params={"gross": True}).json()["items"]
     assert [r["id"] for r in rows] == [sample_records[0]["conversation_id"]]
     assert rows[0]["evaluation"]["gross_reasons"][0]["category"] == "Оскорбление"
+
+
+def test_analytics_endpoints(client, fake_llm, sample_records):
+    _upload(client, sample_records[:3])
+    fake_llm.answers = {A: {"c3": "N", "c8": "Y"}}
+    _run_and_wait(client, {"mode": "single"})
+    data = client.get("/api/analytics/map").json()
+    assert len(data["items"]) == 3
+    item = data["items"][0]
+    assert item["x"] == 63.64 and item["y"] == 100.00 and item["gross"] is True
+    assert item["total"] is not None and item["needs_review"] is False
+    dist = client.get("/api/analytics/distribution").json()
+    assert dist["n"] == 3 and dist["median"] == item["total"]
+    assert client.get("/api/analytics/benchmark").json()["modes"]["ensemble"]["dialogs"] == 12
+
+
+def test_axis_edit_does_not_force_model_call(client, fake_llm, sample_records):
+    """Смена оси карты не меняет того, что видит модель."""
+    _upload(client, sample_records[:1])
+    _run_and_wait(client, {"mode": "single"})
+    calls = len(fake_llm.calls)
+    changed = client.patch("/api/checklists/freedom-default/criteria/c1", json={"map_axis": "resolution"}).json()
+    job = _run_and_wait(client, {"mode": "single", "version": changed["version"], "changed_only": True})
+    assert job["errors"] == 0 and len(fake_llm.calls) == calls
+
+
+def test_analytics_defaults_to_most_complete_version(client, fake_llm, sample_records):
+    """После правки чек-листа на новой версии оценены единицы, аналитика не должна пустеть."""
+    _upload(client, sample_records[:3])
+    _run_and_wait(client, {"mode": "single"})
+    complete = client.get("/api/analytics/map").json()["version"]
+    changed = client.patch("/api/checklists/freedom-default/criteria/c7", json={"weight": 10}).json()
+    _run_and_wait(client, {"conversation_ids": [sample_records[0]["conversation_id"]], "mode": "single", "version": changed["version"]})
+    data = client.get("/api/analytics/map").json()
+    assert data["version"] == complete and len(data["items"]) == 3
+    assert client.get("/api/stats").json()["checklist_version"] == complete
+    assert len(client.get("/api/analytics/map", params={"version": changed["version"]}).json()["items"]) == 1

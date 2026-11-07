@@ -1,7 +1,35 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Spinner } from '@fluentui/react-components'
 import type { CriterionResult } from '../api'
 import { AGREEMENT, answerLabel, answerTone } from '../format'
+
+const TengeCoins = lazy(() => import('./TengeCoins'))
+
+/** Пустое состояние: что случилось, что делать дальше и кнопка этого действия. */
+export function EmptyState({ title, hint, action, coins = true }: {
+  title: string
+  hint: string
+  action?: ReactNode
+  coins?: boolean
+}) {
+  const caption = (
+    <>
+      <h2>{title}</h2>
+      <p>{hint}</p>
+      {action}
+    </>
+  )
+  if (!coins) {
+    return <div className="card empty stack" data-testid="empty"><b>{title}</b><span>{hint}</span>{action && <div>{action}</div>}</div>
+  }
+  return (
+    <div data-testid="empty">
+      <Suspense fallback={<div className="coin-stage"><div className="coin-host" /><div className="coin-caption">{caption}</div></div>}>
+        <TengeCoins>{caption}</TengeCoins>
+      </Suspense>
+    </div>
+  )
+}
 
 export function Loading() {
   return <div className="empty"><Spinner label="Загрузка" /></div>

@@ -12,7 +12,8 @@ import {
   api, waitForJob, type ConversationCard, type CriterionResult, type Evaluation, type EvaluationDiff,
   type SpeechMetrics, type Turn, type WhisperStatus,
 } from '../api'
-import { AgreementDots, AnswerBadge, ErrorBox, Loading, ScaleBar } from '../components/common'
+import { AgreementDots, AnswerBadge, EmptyState, ErrorBox, Loading, ScaleBar, Segments } from '../components/common'
+import QualityOctagon, { CriterionPassport, pointsAfterWeight, stepOf } from '../components/QualityOctagon'
 import {
   AGREEMENT, CHANNEL, MODE, SPEAKER, answerLabel, answerTone, clock, dateTime, money, points, score, seconds,
   type Tone,
@@ -21,28 +22,20 @@ import { useRole } from '../App'
 
 const TONE_COLOR: Record<Tone, string> = { yes: '#138a4e', no: '#d13b45', mid: '#e2a227', na: '#9aa09b' }
 
-function pointsLabel(item: CriterionResult): string {
-  if (item.answer === 'NA') return 'N/A'
-  if (item.type === 'flag') return ''
-  return `${points(item.weighted_points)} / ${points(item.weight)}`
-}
-
-function stepLabel(item: CriterionResult): string | null {
-  if (item.type !== 'scale' || item.answer === 'NA') return null
-  return `${item.answer} из ${Math.max(...item.scale.map((s) => s.value))}`
-}
+const pointsLabel = (item: CriterionResult): string => pointsAfterWeight(item)
+const stepLabel = (item: CriterionResult): string | null => stepOf(item)
 
 function ScoreRing({ value }: { value: number | null }) {
-  const radius = 30
+  const radius = 40
   const circumference = 2 * Math.PI * radius
   const share = Math.max(0, Math.min(100, value ?? 0)) / 100
   return (
     <div className="ring" role="img" aria-label={`Итог ${score(value)} из 100`}>
-      <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
-        <circle cx="38" cy="38" r={radius} fill="none" stroke="var(--na-bg)" strokeWidth="5" />
+      <svg width="88" height="88" viewBox="0 0 88 88" aria-hidden="true">
+        <circle cx="44" cy="44" r={radius} fill="none" stroke="var(--na-bg)" strokeWidth="4" />
         <circle
-          cx="38" cy="38" r={radius} fill="none" stroke={(value ?? 0) < 50 ? '#d13b45' : 'var(--accent)'}
-          strokeWidth="5" strokeLinecap="round" transform="rotate(-90 38 38)"
+          cx="44" cy="44" r={radius} fill="none" stroke={(value ?? 0) < 50 ? '#d13b45' : 'var(--accent)'}
+          strokeWidth="4" strokeLinecap="round" transform="rotate(-90 44 44)"
           strokeDasharray={`${share * circumference} ${circumference}`}
         />
       </svg>
@@ -64,7 +57,7 @@ function CriterionRow({ item, open, onToggle, onJump }: {
         <span>
           <b>{item.title}</b>{' '}
           {item.type !== 'flag' && <span className="muted small">вес {points(item.weight)}</span>}
-          {item.source === 'reviewer' && <span className="badge plain" style={{ marginLeft: 6 }}>решение</span>}
+          {item.source === 'reviewer' && <span className="badge plain" style={{ marginLeft: 8 }}>решение</span>}
         </span>
         <AnswerBadge item={item} answer={item.answer} />
         <ScaleBar item={item} answer={item.answer} />
@@ -221,7 +214,7 @@ const LANES = [
   { speaker: 'operator', label: 'Оператор' },
 ]
 
-function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing }: {
+function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing, focus }: {
   id: string
   turns: Turn[]
   marks: Mark[]
@@ -229,6 +222,7 @@ function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing }: {
   seekRef: React.MutableRefObject<((t: number) => void) | null>
   onTime: (t: number) => void
   playing: number | null
+  focus: { title: string; turns: number[] } | null
 }) {
   const audio = useRef<HTMLAudioElement>(null)
   const [time, setTime] = useState(0)
@@ -253,6 +247,11 @@ function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing }: {
 
   const at = (n: number) => turns.find((t) => t.n === n)?.t_audio ?? 0
   const pct = (t: number) => (length ? Math.min(100, (t / length) * 100) : 0)
+  // Две выноски на расстоянии: ближе они накладываются друг на друга.
+  const callouts = (focus?.turns ?? []).reduce<number[]>((kept, n) => {
+    if (kept.length < 2 && kept.every((other) => Math.abs(pct(at(other)) - pct(at(n))) > 30)) kept.push(n)
+    return kept
+  }, [])
   const laneOf = (n: number) => (turns.find((t) => t.n === n)?.speaker === 'client' ? 'client' : 'operator')
   const spoken = turns.filter((t) => ['client', 'operator'].includes(t.speaker) && t.t_audio !== null && t.t_audio !== undefined)
   // Конец реплики неизвестен: берём следующую реплику, но не больше времени на произнесение слов.
@@ -275,7 +274,7 @@ function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing }: {
         controls
         preload="metadata"
         src={api.audioUrl(id)}
-        style={{ width: '100%', height: 36 }}
+        style={{ width: '100%', height: 32 }}
         onLoadedMetadata={(e) => setLength(e.currentTarget.duration || duration)}
         onError={() => setError('Запись недоступна. Ссылка организаторов могла истечь, повторите позже.')}
         onTimeUpdate={(e) => {
@@ -284,6 +283,28 @@ function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing }: {
         }}
       />
       <div className="tracks">
+        {callouts.length > 0 && (
+          <div className="callout-row">
+            <span />
+            <div>
+              {callouts.map((n) => (
+                <span key={n}>
+                  <span
+                    className="lane-callout"
+                    data-testid="lane-callout"
+                    style={pct(at(n)) > 60 ? { right: `${100 - pct(at(n))}%` } : { left: `${pct(at(n))}%` }}
+                  >
+                    #{n} {focus?.title}
+                  </span>
+                  <span
+                    className="callout-line"
+                    style={{ left: `${pct(at(n))}%`, height: laneOf(n) === 'client' ? 12 : 40 }}
+                  />
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {LANES.map((lane) => (
           <div key={lane.speaker} className="lane-row">
             <span className="lane-label small muted">{lane.label}</span>
@@ -348,6 +369,9 @@ function Details({ evaluation, history, onOpen }: {
     <div className="stack lg" style={{ padding: 16 }}>
       <div className="stack">
         <h3>Оценка</h3>
+        <div className="small">
+          Чек-лист: {evaluation.checklist_name}, версия {evaluation.checklist_version}.
+        </div>
         <div className="small">
           Режим: {MODE[evaluation.mode] ?? evaluation.mode}. Модели:{' '}
           <span className="mono">{Object.values(evaluation.models).join(', ')}</span>.
@@ -443,6 +467,8 @@ export default function ConversationPage() {
   const [diff, setDiff] = useState<EvaluationDiff | null>(null)
   const [whisper, setWhisper] = useState<WhisperStatus | null>(null)
   const [showWhisper, setShowWhisper] = useState(false)
+  const [view, setView] = useState<'scheme' | 'list'>('scheme')
+  const [focused, setFocused] = useState<string | null>(null)
   const seekRef = useRef<((t: number) => void) | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -565,6 +591,12 @@ export default function ConversationPage() {
   if (!card) return <main className="content"><Loading /></main>
 
   const sections = final?.sections.filter((s) => s.max > 0) ?? []
+  const driver = evaluation?.score_drivers?.[0]?.criterion_id
+  const passportItem = criteria.find((c) => c.criterion_id === (focused ?? open ?? driver)) ?? criteria[0] ?? null
+  const activate = (criterionId: string) => {
+    setFocused(criterionId)
+    setOpen(criterionId)
+  }
   const lastTime = card.turns[card.turns.length - 1]?.t_audio ?? card.turns[card.turns.length - 1]?.t_sec ?? 0
   const openAppeals = new Set(evaluation?.appeals.filter((a) => a.status === 'open').map((a) => a.criterion_id))
   const grossItems = criteria.filter((c) => final?.gross_items.includes(c.criterion_id))
@@ -573,13 +605,14 @@ export default function ConversationPage() {
   return (
     <main className="content fill">
       <div className="card card-head">
-        <div className="row wrap" style={{ justifyContent: 'space-between' }}>
+        <div className="row wrap between">
           <div className="row wrap">
             <h1>{isCall ? 'Звонок' : 'Диалог'} <span className="mono">{card.id}</span></h1>
             {final?.gross_violation && (
               <span className="badge no row"><ShieldError20Regular /> Грубое нарушение</span>
             )}
             {evaluation?.needs_review && <span className="badge mid">На проверку</span>}
+            {final && <span className="head-score" data-testid="head-score">{score(final.total)}</span>}
           </div>
           <div className="row">
             {progress && <span className="muted">{progress}</span>}
@@ -607,20 +640,10 @@ export default function ConversationPage() {
           </div>
         </div>
         <div className="facts">
-          <div><span className="label">Канал</span>{CHANNEL[card.channel] ?? card.channel}</div>
-          <div><span className="label">Язык</span>{card.language}</div>
-          <div><span className="label">Оператор</span>{card.operator ?? 'Не определён'}</div>
-          {card.started_at && <div><span className="label">Начало</span>{dateTime(card.started_at)}</div>}
-          {evaluation && (
-            <>
-              <div><span className="label">Чек-лист</span>{evaluation.checklist_name}, версия {evaluation.checklist_version}</div>
-              <div className="grow"><span className="label">Модели оценки</span>
-                <span className="small">{Object.values(evaluation.models).join(', ') || '—'}</span>
-              </div>
-              <div><span className="label">Стоимость</span><span className="mono">{money(evaluation.cost_usd)}</span></div>
-              <div><span className="label">Время</span><span className="mono">{seconds(evaluation.latency_ms)}</span></div>
-            </>
-          )}
+          <span>{card.operator ?? 'Оператор не определён'}</span>
+          <span>{CHANNEL[card.channel] ?? card.channel}</span>
+          <span>{card.language}</span>
+          {card.started_at && <span className="mono small">{dateTime(card.started_at)}</span>}
         </div>
       </div>
 
@@ -657,6 +680,7 @@ export default function ConversationPage() {
               seekRef={seekRef}
               onTime={onAudioTime}
               playing={playing}
+              focus={passportItem ? { title: passportItem.title, turns: passportItem.evidence_ids } : null}
             />
           )}
           <div className="card panel">
@@ -694,7 +718,7 @@ export default function ConversationPage() {
               </div>
             )}
             <div className="transcript-wrap">
-              <div className="scroll" ref={scroller}>
+              <div className="scroll" ref={scroller} tabIndex={0} role="region" aria-label="Транскрипт диалога">
                 {card.turns.map((turn) => {
                   const tone = highlight.get(turn.n)
                   const classes = ['turn', turn.speaker]
@@ -750,15 +774,21 @@ export default function ConversationPage() {
         <div className="column">
           <div className="card panel result-panel">
             {!evaluation ? (
-              <div className="empty">Диалог ещё не оценён. Нажмите «Оценить».</div>
+              <div style={{ padding: 8 }}>
+                <EmptyState
+                  title="Диалог ещё не оценён"
+                  hint="Запустите оценку, и здесь появятся баллы, объяснения и реплики-доказательства."
+                  action={<Button disabled={Boolean(progress)} onClick={() => reevaluate(false)}>Оценить</Button>}
+                />
+              </div>
             ) : evaluation.status !== 'ok' || !final ? (
               <div style={{ padding: 16 }}>
                 <ErrorBox message={`Оценка не удалась: ${evaluation.error ?? 'неизвестная ошибка'}`} />
               </div>
             ) : (
               <>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
-                  <div className="row top" style={{ justifyContent: 'space-between', gap: 16 }}>
+                <div className="result-head">
+                  <div className="row top between" style={{ gap: 16 }}>
                     <div className="row">
                       <ScoreRing value={final.total} />
                       <div>
@@ -769,7 +799,7 @@ export default function ConversationPage() {
                       </div>
                     </div>
                     <div className="grow">
-                      <div className="row small" style={{ gap: 2 }}>
+                      <div className="row small" style={{ gap: 4 }}>
                         {sections.map((s) => (
                           <div key={s.id} style={{ flex: s.max }} className="muted">
                             {s.title}<br /><span className="mono">{points(s.earned)} / {points(s.max)}</span>
@@ -784,7 +814,7 @@ export default function ConversationPage() {
                     </div>
                   </div>
                   {final.gross_violation && (
-                    <div className="gross-banner" style={{ marginTop: 8 }}>
+                    <div className="gross-banner">
                       <ShieldError20Regular />
                       <span>
                         {evaluation.gross_reasons?.[0]?.category ?? 'Грубое нарушение'}: {grossItems[0]?.reasoning ?? grossItems[0]?.title}
@@ -794,17 +824,17 @@ export default function ConversationPage() {
                   {Boolean(evaluation.score_drivers?.length) && (
                     <div className="drivers">
                       <h3>Почему снижена оценка</h3>
-                      {evaluation.score_drivers?.map((driver) => (
-                        <div key={driver.criterion_id} className="driver">
-                          <span className="mono driver-loss">−{points(driver.lost_points)}</span>
-                          <span className="grow"><b>{driver.title}.</b> {driver.reason}</span>
-                          {driver.turn !== null && (
+                      {evaluation.score_drivers?.slice(0, 3).map((item) => (
+                        <div key={item.criterion_id} className="driver">
+                          <span className="mono driver-loss">−{points(item.lost_points)}</span>
+                          <span className="grow"><b>{item.title}.</b> {item.reason}</span>
+                          {item.turn !== null && (
                             <Button
                               size="small"
                               onClick={() => {
                                 setTab('checklist')
-                                setOpen(driver.criterion_id)
-                                jump(driver.turn as number)
+                                activate(item.criterion_id)
+                                jump(item.turn as number)
                               }}
                             >
                               Перейти к фрагменту
@@ -821,12 +851,33 @@ export default function ConversationPage() {
                   <Tab value="appeals">Апелляции ({evaluation.appeals.length})</Tab>
                 </TabList>
                 <div className="scroll">
-                  {tab === 'checklist' && final.sections.map((section) => {
+                  {tab === 'checklist' && (
+                    <div className="view-toggle">
+                      <Segments
+                        value={view}
+                        onChange={setView}
+                        options={[{ value: 'scheme', label: 'Схема' }, { value: 'list', label: 'Список' }]}
+                      />
+                    </div>
+                  )}
+                  {tab === 'checklist' && view === 'scheme' && (
+                    <div style={{ padding: 8 }}>
+                      <QualityOctagon
+                        items={criteria}
+                        total={final.total}
+                        active={passportItem?.criterion_id}
+                        onActivate={activate}
+                        compact={isCall}
+                      />
+                      {passportItem && <CriterionPassport item={passportItem} onJump={jump} />}
+                    </div>
+                  )}
+                  {tab === 'checklist' && view === 'list' && final.sections.map((section) => {
                     const items = criteria.filter((c) => c.section === section.id)
                     if (!items.length) return null
                     return (
                       <div key={section.id}>
-                        <div className="caps" style={{ padding: '10px 12px 4px' }}>{section.title}</div>
+                        <div className="caps" style={{ padding: '12px 12px 4px' }}>{section.title}</div>
                         {items.map((item) => (
                           <div key={item.criterion_id}>
                             <CriterionRow
@@ -836,7 +887,7 @@ export default function ConversationPage() {
                               onJump={jump}
                             />
                             {open === item.criterion_id && (
-                              <div className="row" style={{ padding: '0 14px 10px 38px' }}>
+                              <div className="row" style={{ padding: '0 16px 12px 32px' }}>
                                 {openAppeals.has(item.criterion_id)
                                   ? <span className="badge mid">Апелляция на рассмотрении</span>
                                   : <Button size="small" onClick={() => setAppealFor(item.criterion_id)}>Оспорить этот критерий</Button>}

@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import Counter, defaultdict
 from statistics import mean
 
 from fastapi import APIRouter
@@ -12,12 +12,14 @@ router = APIRouter()
 def _resolve_version(checklist_id: str, version: int | None) -> int | None:
     if version is not None:
         return version
+    # Самая полная версия: после правки чек-листа на новой версии оценены единицы диалогов.
     with connect() as conn:
         row = conn.execute(
-            "SELECT MAX(checklist_version) AS v FROM evaluations WHERE checklist_id=? AND status='ok'",
+            "SELECT checklist_version AS v, COUNT(DISTINCT conversation_id) AS n FROM evaluations "
+            "WHERE checklist_id=? AND status='ok' GROUP BY checklist_version ORDER BY n DESC, v DESC LIMIT 1",
             (checklist_id,),
         ).fetchone()
-    return row["v"]
+    return row["v"] if row else None
 
 
 @router.get("/stats")
@@ -90,7 +92,10 @@ def stats(
         )
     costs = [v["cost_usd"] for _, v in views]
     latencies = [v["latency_ms"] for _, v in views]
+    channels = Counter(conversation["channel"] for conversation, _ in views)
+    languages = Counter(conversation["language"] for conversation, _ in views)
     return {
+        "channels": channels, "languages": languages,
         "checklist_id": checklist_id, "checklist_version": version,
         "evaluated": len(views), "total_conversations": len(ids),
         "avg_score": round(mean(scores), 2) if scores else None,

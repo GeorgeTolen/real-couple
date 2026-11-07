@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@fluentui/react-components'
 import { Link } from 'react-router-dom'
 import { api, type ConversationRow, type GrossReason } from '../api'
-import { ErrorBox, Loading } from '../components/common'
+import { EmptyState, ErrorBox, Loading } from '../components/common'
 import { CHANNEL, score } from '../format'
 
 const CATEGORIES = ['Раскрытие данных', 'Платная услуга в обход компании', 'Оскорбление']
@@ -59,7 +59,12 @@ export default function GrossPage() {
       </div>
       <ErrorBox message={error} />
       {rows === null ? <Loading /> : !visible.length ? (
-        <div className="card empty">Грубых нарушений с такими условиями нет.</div>
+        <EmptyState
+          coins={false}
+          title="Грубых нарушений с такими условиями нет"
+          hint="Снимите фильтр по типу или посмотрите весь журнал диалогов."
+          action={<Link to="/">Открыть журнал диалогов</Link>}
+        />
       ) : (
         <div className="gross-layout">
           <div className="table-wrap">

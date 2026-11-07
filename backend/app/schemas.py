@@ -41,6 +41,7 @@ class Criterion(BaseModel):
     export_id: str | None = None
     categories: list[str] | None = None
     evidence_required_on_no: bool = False
+    map_axis: Literal["resolution", "service"] | None = None
 
     @model_validator(mode="after")
     def _check(self):
@@ -131,6 +132,7 @@ class CriterionPatch(BaseModel):
     channels: list[str] | None = None
     guidance: str | None = None
     export_id: str | None = None
+    map_axis: Literal["resolution", "service"] | None = None
 
 
 class AppealRequest(BaseModel):
