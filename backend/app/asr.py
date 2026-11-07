@@ -4,7 +4,8 @@
 Запись одноканальная, поэтому спикер берётся из транскрипта организаторов: слова Whisper
 привязываются к репликам выравниванием текстов, нумерация реплик не меняется.
 
-В записи звучит то, что организаторы скрыли масками, поэтому файлы лежат только в data/whisper.
+В записи звучит то, что организаторы скрыли масками. Распознанное на месте маски заменяется маской,
+сырые слова не сохраняются, а файлы лежат только в data/whisper вне git.
 """
 import asyncio
 import difflib
@@ -27,7 +28,11 @@ log = logging.getLogger("cqa.asr")
 LANGUAGES = {"RU": "ru", "KZ": "kk", "EN": "en"}
 INITIAL_PROMPT = "Служба поддержки Freedom Broker, Фридом Брокер, Tradernet, брокерский счёт, поручение."
 TIME_TOLERANCE_SEC = 0.5
+GENERIC_MASK = "[Скрыто]"
+KNOWN_NAMES = {"freedom", "broker", "фридом", "брокер", "брокера", "tradernet", "kaspi", "whatsapp"}
+_MASK_TOKEN = "\0mask\0"
 _MASK = re.compile(r"\[[^\]]*\]")
+_MASK_SPLIT = re.compile(r"(\[[^\]]*\])")
 _TOKEN = re.compile(r"[^\w]+", re.UNICODE)
 _gpu_lock = threading.Lock()
 _model = None
@@ -122,36 +127,66 @@ def _normalize(text: str) -> str:
     return _TOKEN.sub("", text.lower().replace("ё", "е"))
 
 
+def _looks_sensitive(word: str) -> bool:
+    """Слово, которого нет у организаторов: с цифрами или с большой буквы, то есть возможное имя."""
+    if any(ch.isdigit() for ch in word):
+        return True
+    return word[:1].isupper() and _normalize(word) not in KNOWN_NAMES
+
+
 def align_words_to_turns(turns: list[dict], words: list[dict[str, Any]]) -> tuple[dict[int, str], float]:
-    """Привязывает слова Whisper к репликам. Возвращает текст по номерам реплик и долю совпавших слов."""
+    """Привязывает слова Whisper к репликам и прячет то, что организаторы скрыли масками.
+
+    Возвращает текст по номерам реплик и долю совпавших слов. Всё, что расслышано на месте маски,
+    заменяется этой маской. Слова вне текста организаторов с цифрами или большой буквы тоже скрываются.
+    """
     spoken = [
         t for t in turns
         if t["speaker"] in ("operator", "client", "bot") and not t.get("duplicate_of")
     ]
     tokens: list[str] = []
     owners: list[int] = []
+    masks: dict[int, str] = {}
     for turn in spoken:
-        for piece in _MASK.sub(" ", turn["text"]).split():
-            token = _normalize(piece)
-            if token:
-                tokens.append(token)
+        for part in _MASK_SPLIT.split(turn["text"]):
+            if _MASK.fullmatch(part):
+                masks[len(tokens)] = part
+                tokens.append(_MASK_TOKEN)
                 owners.append(turn["n"])
+                continue
+            for piece in part.split():
+                token = _normalize(piece)
+                if token:
+                    tokens.append(token)
+                    owners.append(turn["n"])
     if not words or not spoken:
         return {}, 0.0
+
     heard = [_normalize(w["word"]) for w in words]
     owner_of: list[int | None] = [None] * len(words)
+    pairs: list[tuple[int, int]] = []
     matcher = difflib.SequenceMatcher(None, tokens, heard, autojunk=False)
-    matched = 0
     for block in matcher.get_matching_blocks():
         for offset in range(block.size):
             owner_of[block.b + offset] = owners[block.a + offset]
-            matched += 1
+            pairs.append((block.a + offset, block.b + offset))
 
-    position = {t["n"]: i for i, t in enumerate(spoken)}
+    # Всё услышанное между совпавшими соседями маски считается скрытым текстом.
+    hidden: dict[int, tuple[str, int]] = {}
+    for position, mask in masks.items():
+        before = max((b for a, b in pairs if a < position), default=-1)
+        after = min((b for a, b in pairs if a > position), default=len(words))
+        for index in range(before + 1, after):
+            hidden[index] = (mask, owners[position])
+
+    order = {t["n"]: i for i, t in enumerate(spoken)}
     resolved: list[int] = []
     for index, owner in enumerate(owner_of):
         if owner is not None:
             resolved.append(owner)
+            continue
+        if index in hidden:
+            resolved.append(hidden[index][1])
             continue
         previous = resolved[-1] if resolved else None
         following = next((o for o in owner_of[index + 1:] if o is not None), None)
@@ -159,8 +194,8 @@ def align_words_to_turns(turns: list[dict], words: list[dict[str, Any]]) -> tupl
             resolved.append(previous)
             continue
         # Слово не совпало ни с чем. Реплика могла быть искажена целиком, поэтому решает время.
-        low = position[previous] if previous is not None else 0
-        high = position[following] if following is not None else len(spoken) - 1
+        low = order[previous] if previous is not None else 0
+        high = order[following] if following is not None else len(spoken) - 1
         choice = previous if previous is not None else spoken[low]["n"]
         for turn in spoken[low: high + 1]:
             begin = turn.get("t_audio")
@@ -169,10 +204,19 @@ def align_words_to_turns(turns: list[dict], words: list[dict[str, Any]]) -> tupl
         resolved.append(choice)
 
     grouped: dict[int, list[str]] = {}
-    for word, owner in zip(words, resolved):
-        grouped.setdefault(owner, []).append(word["word"])
-    text = {n: " ".join(parts) for n, parts in grouped.items()}
-    return text, matched / len(words)
+    for index, (word, owner) in enumerate(zip(words, resolved)):
+        parts = grouped.setdefault(owner, [])
+        if index in hidden:
+            text = hidden[index][0]
+        elif owner_of[index] is None and _looks_sensitive(word["word"]):
+            text = GENERIC_MASK
+        else:
+            text = word["word"]
+        if text.startswith("[") and parts and parts[-1] == text:
+            continue
+        parts.append(text)
+    matched = len(pairs)
+    return {n: " ".join(parts) for n, parts in grouped.items()}, matched / len(words)
 
 
 async def run_for_conversation(conversation: dict[str, Any]) -> dict[str, Any]:
@@ -190,7 +234,6 @@ async def run_for_conversation(conversation: dict[str, Any]) -> dict[str, Any]:
         "processing_sec": round(time.monotonic() - started, 1),
         "match_ratio": round(ratio, 3),
         "turns": {str(n): text for n, text in turns.items()},
-        "words": words,
     }
     target = result_path(conversation["id"])
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -205,7 +248,6 @@ def status(conversation_id: str) -> dict[str, Any]:
     path = result_path(conversation_id)
     if path.exists():
         data = json.loads(path.read_text(encoding="utf-8"))
-        data.pop("words", None)
         return {"status": "ready", "available": True, **data}
     if state.get("status") == "error":
         return {"status": "error", "available": is_available(), "error": state.get("error")}

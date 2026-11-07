@@ -442,7 +442,7 @@ export default function ConversationPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [diff, setDiff] = useState<EvaluationDiff | null>(null)
   const [whisper, setWhisper] = useState<WhisperStatus | null>(null)
-  const [showWhisper, setShowWhisper] = useState(true)
+  const [showWhisper, setShowWhisper] = useState(false)
   const seekRef = useRef<((t: number) => void) | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -665,7 +665,7 @@ export default function ConversationPage() {
               <div className="row">
                 {isCall && whisper?.status === 'ready' && (
                   <Switch
-                    label="Whisper рядом"
+                    label="Показать текст Whisper"
                     checked={showWhisper}
                     onChange={(_, data) => setShowWhisper(data.checked)}
                   />
@@ -689,7 +689,7 @@ export default function ConversationPage() {
                 Расшифровка предоставлена организаторами, возможны ошибки распознавания.
                 {whisper?.status === 'error' && ` Whisper: ${whisper.error}`}
                 {whisper?.status === 'ready' && showWhisper && (
-                  ` Whisper ${whisper.model} работает на этом компьютере и на оценку не влияет. В его тексте могут быть данные, скрытые организаторами.`
+                  ` Whisper ${whisper.model} работает на этом компьютере и на оценку не влияет. Распознанное на месте масок заменено масками, полного скрытия это не гарантирует.`
                 )}
               </div>
             )}

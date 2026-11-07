@@ -29,8 +29,8 @@ def test_call_time_is_relative_and_source_is_preserved():
     assert turns[0]["timestamp"] == source
 
 
-def test_all_dev_timestamps_parse(dev_records):
-    for record in dev_records:
+def test_all_sample_timestamps_parse(sample_records):
+    for record in sample_records:
         turns = normalize_transcript(record["transcript"])
         assert all(t["t_sec"] is not None for t in turns), record["conversation_id"]
         assert turns[-1]["n"] == len(record["transcript"])
@@ -183,7 +183,8 @@ def test_whisper_words_follow_organizer_turns():
     spoken = "Здравствуйте, меня зовут Мирас, чем помочь? Хочу вывести деньги. Откройте раздел вывод."
     words = [{"word": w, "start": i * 0.9, "end": i * 0.9 + 0.5} for i, w in enumerate(spoken.split())]
     text, ratio = align_words_to_turns(turns, words)
-    assert "Мирас" in text[1]
+    assert "Мирас" not in text[1]
+    assert "[Имя скрыто]" in text[1] and text[1].startswith("Здравствуйте")
     assert text[2] == "Хочу вывести деньги."
     assert 3 not in text
     assert text[4].startswith("Откройте")
@@ -207,5 +208,28 @@ def test_whisper_distorted_short_turn_is_placed_by_time():
     ]
     text, _ = align_words_to_turns(turns, words)
     assert text[1] == "Как вас зовут"
-    assert text[2] == "Мирас"
+    assert text[2] == "[Скрыто]"
     assert text[3] == "Я не услышала"
+
+
+def test_whisper_hides_everything_under_full_mask():
+    turns = _call(
+        ("00:00", "client", "Добрый день"),
+        ("00:03", "client", "[Персональные данные скрыты]"),
+        ("00:08", "client", "Хочу узнать про счёт"),
+    )
+    spoken = "Добрый день меня зовут татьяна иванова номер 123456 Хочу узнать про счёт"
+    words = [{"word": w, "start": i * 1.0, "end": i + 0.5} for i, w in enumerate(spoken.split())]
+    text, _ = align_words_to_turns(turns, words)
+    joined = " ".join(text.values())
+    assert "татьяна" not in joined and "123456" not in joined
+    assert text[2] == "[Персональные данные скрыты]"
+
+
+def test_whisper_hides_digits_and_names_outside_masks():
+    turns = _call(("00:00", "operator", "Откройте раздел вывод пожалуйста"))
+    spoken = "Откройте раздел Айгуль вывод 8707 пожалуйста Freedom"
+    words = [{"word": w, "start": i * 1.0, "end": i + 0.5} for i, w in enumerate(spoken.split())]
+    text, _ = align_words_to_turns(turns, words)
+    assert "Айгуль" not in text[1] and "8707" not in text[1]
+    assert "Freedom" in text[1] and "[Скрыто]" in text[1]

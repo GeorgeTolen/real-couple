@@ -15,6 +15,8 @@ AGREEMENT_FULL = "full"
 AGREEMENT_ARBITRATED = "arbitrated"
 AGREEMENT_FALLBACK = "unresolved"
 TURN_REF = re.compile(r"#\d+")
+ARBITER_SUFFIX = " (арбитр)"
+NOTE_MARKERS = ("без конкретного сбоя", "недоступен")
 
 
 @dataclass
@@ -127,6 +129,19 @@ def _forced_disputes(checklist: Checklist, opinions: list[dict[str, Any]]) -> se
         if triggered and any(o.get(rule.dispute, {}).get("answer") == "N" for o in opinions):
             forced.add(rule.dispute)
     return forced
+
+
+def item_needs_review(item: dict[str, Any]) -> bool:
+    """Человек нужен, если арбитра не было или он не согласился ни с одним из судей."""
+    if item.get("agreement") == AGREEMENT_FALLBACK:
+        return True
+    if item.get("agreement") != AGREEMENT_ARBITRATED:
+        return False
+    judges = [
+        opinion["answer"] for name, opinion in item["judge_answers"].items()
+        if not name.endswith(ARBITER_SUFFIX)
+    ]
+    return item["answer"] not in judges
 
 
 def _names_failure(opinion: dict[str, Any]) -> bool:
@@ -276,7 +291,6 @@ async def judge_conversation(
     if not disputed:
         return outcome
 
-    outcome.needs_review = True
     arbiter = resolved["arbiter"]
     try:
         verdicts = await _run_single(
@@ -304,9 +318,12 @@ async def judge_conversation(
     for cid in disputed:
         judges = {name_a: first[cid], name_b: second[cid]}
         if verdicts:
-            judges[f"{arbiter} (арбитр)"] = verdicts[cid]
+            judges[f"{arbiter}{ARBITER_SUFFIX}"] = verdicts[cid]
             outcome.criteria[cid] = _final(verdicts[cid], AGREEMENT_ARBITRATED, judges)
         else:
             chosen = _fallback_answer(by_id[cid], first[cid], second[cid])
             outcome.criteria[cid] = _final(chosen, AGREEMENT_FALLBACK, judges)
+    outcome.needs_review = outcome.needs_review or any(
+        item_needs_review(outcome.criteria[cid]) for cid in disputed
+    )
     return outcome

@@ -315,6 +315,15 @@ export type Stats = {
   avg_latency_ms: number | null
 }
 
+export type Measurement = {
+  accuracy: number | null
+  cost_per_dialog: number | null
+  dialogs: number | null
+  measured_at: string | null
+}
+
+export type ModeInfo = Measurement & { label: string; holdout?: Measurement }
+
 export type ModelsInfo = {
   judge_a: { model: string; available: boolean | null }
   judge_b: { model: string; available: boolean | null }
@@ -322,7 +331,7 @@ export type ModelsInfo = {
   local: { model: string | null; available: boolean | null }
   local_server_up: boolean
   api_key_configured: boolean
-  modes: Record<string, { label: string; cost_per_dialog: number; accuracy: number | null }>
+  modes: Record<string, ModeInfo>
 }
 
 export type ResultsPreview = {

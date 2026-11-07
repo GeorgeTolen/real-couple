@@ -1,20 +1,47 @@
+import json
 import time
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter
 
-from ..config import OPENROUTER_BASE_URL, get_settings
+from ..config import BENCH_DIR, OPENROUTER_BASE_URL, get_settings
 
 router = APIRouter()
 _CACHE_SEC = 300
 _cache: dict = {"at": 0.0, "cloud": None, "local": None}
 
-# Замеры бенчмарка на 12 диалогах DEV, docs/stage2-model-selection.md.
-BENCH = {
-    "ensemble": {"label": "Ансамбль: две модели и арбитр", "cost_per_dialog": 0.024, "accuracy": 98.9},
-    "single": {"label": "Одна модель", "cost_per_dialog": 0.0089, "accuracy": 96.2},
-    "local": {"label": "Локальная модель", "cost_per_dialog": 0.0, "accuracy": 91.1},
+LABELS = {
+    "ensemble": "Ансамбль: две модели и арбитр",
+    "single": "Одна модель",
+    "local": "Локальная модель",
 }
+
+
+def _read_report(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data.get("report", data)
+
+
+def measurement(path: Path) -> dict:
+    """Цифры только из файла замера. Нет файла, значит нет цифры."""
+    report = _read_report(path) or {}
+    return {
+        "accuracy": report.get("accuracy"),
+        "cost_per_dialog": report.get("cost_per_dialog"),
+        "dialogs": report.get("dialogs"),
+        "measured_at": report.get("measured_at"),
+    }
+
+
+def mode_info(mode: str) -> dict:
+    info = {"label": LABELS[mode], **measurement(BENCH_DIR / f"results_{mode}.json")}
+    if mode == "ensemble":
+        info["holdout"] = measurement(BENCH_DIR / "holdout" / "holdout_report.json")
+    return info
 
 
 async def _fetch_ids(base_url: str) -> set[str] | None:
@@ -49,5 +76,5 @@ async def models():
                  {"model": None, "available": False},
         "local_server_up": local is not None,
         "api_key_configured": bool(settings.openrouter_api_key),
-        "modes": BENCH,
+        "modes": {mode: mode_info(mode) for mode in LABELS},
     }

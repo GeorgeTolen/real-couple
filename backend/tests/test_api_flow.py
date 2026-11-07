@@ -39,8 +39,8 @@ def _run_and_wait(client, payload):
     raise AssertionError(f"Задача не завершилась: {job}")
 
 
-def test_full_flow(client, fake_llm, dev_records):
-    records = dev_records[:2]
+def test_full_flow(client, fake_llm, sample_records):
+    records = sample_records[:2]
     _upload(client, records)
     ids = [r["conversation_id"] for r in records]
     fake_llm.answers = {A: {"c5": "N"}}
@@ -131,10 +131,10 @@ def test_full_flow(client, fake_llm, dev_records):
     assert csv_response.status_code == 200 and "consultation" in csv_response.text
 
 
-def test_confirm_keeps_score(client, fake_llm, dev_records):
-    _upload(client, dev_records[:1])
+def test_confirm_keeps_score(client, fake_llm, sample_records):
+    _upload(client, sample_records[:1])
     _run_and_wait(client, {"mode": "single"})
-    conversation_id = dev_records[0]["conversation_id"]
+    conversation_id = sample_records[0]["conversation_id"]
     evaluation = client.get(f"/api/conversations/{conversation_id}").json()["evaluation"]
     appeal_id = client.post(
         f"/api/evaluations/{evaluation['id']}/appeals",
@@ -147,9 +147,9 @@ def test_confirm_keeps_score(client, fake_llm, dev_records):
     assert result["final"]["total"] == result["original"]["total"]
 
 
-def test_replace_criterion_through_api_applies_without_code(client, fake_llm, dev_records):
+def test_replace_criterion_through_api_applies_without_code(client, fake_llm, sample_records):
     """Контроль организаторов: заменить критерий и применить новый чек-лист."""
-    _upload(client, dev_records[:1])
+    _upload(client, sample_records[:1])
     before = client.get("/api/checklists/freedom-default").json()
     response = client.post(
         "/api/checklists/freedom-default/criteria/c5/replace",
@@ -167,7 +167,7 @@ def test_replace_criterion_through_api_applies_without_code(client, fake_llm, de
     job = _run_and_wait(client, {"mode": "single", "version": changed["version"]})
     assert job["errors"] == 0
     assert "Проактивность" in fake_llm.calls[-1]["system"]
-    evaluation = client.get(f"/api/conversations/{dev_records[0]['conversation_id']}").json()["evaluation"]
+    evaluation = client.get(f"/api/conversations/{sample_records[0]['conversation_id']}").json()["evaluation"]
     item = next(c for c in evaluation["original"]["criteria"] if c["criterion_id"] == "c5")
     assert item["title"] == "Проактивность" and item["weighted_points"] == 7.5
 
@@ -221,11 +221,11 @@ def test_quick_checklist_edits_create_versions(client):
     ).status_code == 400
 
 
-def test_gross_filter_returns_reasons(client, fake_llm, dev_records):
-    _upload(client, dev_records[:2])
+def test_gross_filter_returns_reasons(client, fake_llm, sample_records):
+    _upload(client, sample_records[:2])
     fake_llm.answers = {A: {"c8": "Y"}}
     fake_llm.category = "Оскорбление"
-    _run_and_wait(client, {"conversation_ids": [dev_records[0]["conversation_id"]], "mode": "single"})
+    _run_and_wait(client, {"conversation_ids": [sample_records[0]["conversation_id"]], "mode": "single"})
     rows = client.get("/api/conversations", params={"gross": True}).json()["items"]
-    assert [r["id"] for r in rows] == [dev_records[0]["conversation_id"]]
+    assert [r["id"] for r in rows] == [sample_records[0]["conversation_id"]]
     assert rows[0]["evaluation"]["gross_reasons"][0]["category"] == "Оскорбление"

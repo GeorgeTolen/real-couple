@@ -11,7 +11,6 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend backend
 COPY checklists checklists
 COPY frontend/dist frontend/dist
-COPY data/dev.json data/dev.json
 
 WORKDIR /srv/backend
 EXPOSE 8000

@@ -12,3 +12,5 @@ tools/
 *.log
 data/rehearsal/
 data/whisper/
+data/dev.json
+docs/CQA_Hackathon_Student_Guide_v3.pdf

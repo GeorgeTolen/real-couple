@@ -75,8 +75,8 @@ async def _prepare(records, group="DEV"):
     return repo.get_checklist("freedom-default")
 
 
-async def test_export_refuses_partial_then_writes_one_based_turns(database, fake_llm, dev_records):
-    records = dev_records[:2]
+async def test_export_refuses_partial_then_writes_one_based_turns(database, fake_llm, sample_records):
+    records = sample_records[:2]
     checklist = await _prepare(records)
     first = records[0]["conversation_id"]
     await evaluator.evaluate_conversation(first, checklist, "single")
@@ -95,8 +95,8 @@ async def test_export_refuses_partial_then_writes_one_based_turns(database, fake
     assert doc["results"][0]["criteria"][0]["evidence_turns"] == [1]
 
 
-async def test_export_refuses_version_without_codes(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_export_refuses_version_without_codes(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     replacement = {
         "id": "c5", "section": "dialogue_closure", "title": "Новый", "type": "binary", "weight": 15,
@@ -112,8 +112,8 @@ async def test_export_refuses_version_without_codes(database, fake_llm, dev_reco
     assert export.latest_exportable_version(checklist.id) == checklist.version
 
 
-async def test_export_uses_requested_version_not_latest_evaluation(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_export_uses_requested_version_not_latest_evaluation(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     conversation_id = records[0]["conversation_id"]
     await evaluator.evaluate_conversation(conversation_id, checklist, "single")
@@ -128,8 +128,8 @@ async def test_export_uses_requested_version_not_latest_evaluation(database, fak
     assert value(new) == 0
 
 
-async def test_failed_evaluation_is_exported_as_error(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_failed_evaluation_is_exported_as_error(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     fake_llm.fail = {"google/gemini-3.8-flash"}
     result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
@@ -140,8 +140,8 @@ async def test_failed_evaluation_is_exported_as_error(database, fake_llm, dev_re
     assert export.validate_results(doc, 1) == []
 
 
-async def test_ensemble_agreement_arbiter_and_insurance(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_ensemble_agreement_arbiter_and_insurance(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     a, b, arbiter = "google/gemini-3.8-flash", "openai/gpt-6.1-sol", "google/gemini-4-argon"
     fake_llm.answers = {
@@ -162,8 +162,8 @@ async def test_ensemble_agreement_arbiter_and_insurance(database, fake_llm, dev_
     assert set(arbiter_call["schema"]["required"]) == {"c4", "c8"}
 
 
-async def test_ensemble_without_arbiter_takes_lower_scale(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_ensemble_without_arbiter_takes_lower_scale(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     a, b, arbiter = "google/gemini-3.8-flash", "openai/gpt-6.1-sol", "google/gemini-4-argon"
     fake_llm.answers = {a: {"c4": "20", "c5": "Y"}, b: {"c4": "10", "c5": "N"}}
@@ -176,9 +176,9 @@ async def test_ensemble_without_arbiter_takes_lower_scale(database, fake_llm, de
     assert view["needs_review"] is True
 
 
-async def test_demo_edit_of_weight_does_not_reach_submission(database, fake_llm, dev_records):
+async def test_demo_edit_of_weight_does_not_reach_submission(database, fake_llm, sample_records):
     """Правка веса на демо создаёт новую версию, но сдача остаётся на версии организаторов."""
-    records = dev_records[:1]
+    records = sample_records[:1]
     checklist = await _prepare(records)
     changed = repo.patch_criterion(checklist.id, "c5", {"weight": 25})
     assert export.is_official(checklist) is True
@@ -186,8 +186,8 @@ async def test_demo_edit_of_weight_does_not_reach_submission(database, fake_llm,
     assert export.latest_exportable_version(checklist.id) == checklist.version
 
 
-async def test_check_against_data_catches_bad_turn_and_score(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_check_against_data_catches_bad_turn_and_score(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
     doc = export.build_results("DEV")
@@ -206,8 +206,8 @@ async def test_check_against_data_catches_bad_turn_and_score(database, fake_llm,
     assert any("нет в импортированных" in p for p in export.check_against_data(broken, checklist))
 
 
-async def test_changed_only_asks_model_about_new_criterion_only(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_changed_only_asks_model_about_new_criterion_only(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     conversation_id = records[0]["conversation_id"]
     await evaluator.evaluate_conversation(conversation_id, checklist, "single")
@@ -228,8 +228,8 @@ async def test_changed_only_asks_model_about_new_criterion_only(database, fake_l
     assert len(view["original"]["criteria"]) == 8
 
 
-async def test_gross_reason_has_category_and_quote(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_gross_reason_has_category_and_quote(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     fake_llm.answers = {"google/gemini-3.8-flash": {"c8": "Y"}}
     fake_llm.category = "Раскрытие данных"
@@ -240,11 +240,11 @@ async def test_gross_reason_has_category_and_quote(database, fake_llm, dev_recor
     assert reason["turn"] == 1 and reason["quote"]
 
 
-async def test_gross_without_category_is_rejected_by_validator(database, dev_records):
+async def test_gross_without_category_is_rejected_by_validator(database, sample_records):
     from app.judge import make_validator
     from app.schemas import Checklist
 
-    records = dev_records[:1]
+    records = sample_records[:1]
     checklist: Checklist = await _prepare(records)
     validate = make_validator(checklist, "agent chat", 5, only=["c8"])
     bad = {"c8": {"answer": "Y", "category": "нет", "reasoning": "", "evidence_ids": [], "checked_range": []}}
@@ -252,8 +252,8 @@ async def test_gross_without_category_is_rejected_by_validator(database, dev_rec
         validate(bad)
 
 
-async def test_score_drivers_sorted_by_loss(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_score_drivers_sorted_by_loss(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     fake_llm.answers = {"google/gemini-3.8-flash": {"c3": "N", "c7": "N", "c5": "Y"}}
     result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
@@ -265,8 +265,8 @@ async def test_score_drivers_sorted_by_loss(database, fake_llm, dev_records):
 A_MODEL, B_MODEL, ARBITER_MODEL = "google/gemini-3.8-flash", "openai/gpt-6.1-sol", "google/gemini-4-argon"
 
 
-async def test_repeat_returns_saved_evaluation_and_force_creates_new(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_repeat_returns_saved_evaluation_and_force_creates_new(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     conversation_id = records[0]["conversation_id"]
     first = await evaluator.evaluate_conversation(conversation_id, checklist, "ensemble")
@@ -286,8 +286,8 @@ async def test_repeat_returns_saved_evaluation_and_force_creates_new(database, f
     assert repo.diff_evaluations(forced["evaluation_id"])["old_id"] == first["evaluation_id"]
 
 
-async def test_scale_below_top_without_failure_is_requested_again(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_scale_below_top_without_failure_is_requested_again(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     fake_llm.answers = {A_MODEL: {"c6": "7"}}
     fake_llm.no_ref = {A_MODEL: 1}
@@ -300,8 +300,8 @@ async def test_scale_below_top_without_failure_is_requested_again(database, fake
     assert view["needs_review"] is False
 
 
-async def test_no_answer_without_evidence_follows_config(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_no_answer_without_evidence_follows_config(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     fake_llm.answers = {A_MODEL: {"c5": "N", "c3": "N"}}
     fake_llm.no_ref = {A_MODEL: 1}
@@ -310,8 +310,8 @@ async def test_no_answer_without_evidence_follows_config(database, fake_llm, dev
     assert fake_llm.calls[-1]["schema"]["required"] == ["c5"]
 
 
-async def test_failure_never_named_goes_to_review(database, fake_llm, dev_records):
-    records = dev_records[:1]
+async def test_failure_never_named_goes_to_review(database, fake_llm, sample_records):
+    records = sample_records[:1]
     checklist = await _prepare(records)
     fake_llm.answers = {A_MODEL: {"c6": "7"}}
     fake_llm.no_ref = {A_MODEL: 2}
@@ -323,11 +323,11 @@ async def test_failure_never_named_goes_to_review(database, fake_llm, dev_record
     assert all(d["criterion_id"] != "c6" for d in view["score_drivers"])
 
 
-async def test_no_arbiter_without_failure_takes_top_step(database, fake_llm, dev_records):
+async def test_no_arbiter_without_failure_takes_top_step(database, fake_llm, sample_records):
     """Правило «брать меньшее» убрано: без названного сбоя шкала не снижается."""
     from app.judge import _fallback_answer
 
-    checklist = await _prepare(dev_records[:1])
+    checklist = await _prepare(sample_records[:1])
     c6 = checklist.criterion("c6")
     plain = lambda answer: {"answer": answer, "reasoning": "Всё ясно", "evidence_ids": [], "checked_range": None}
     named = {"answer": "4", "reasoning": "Сбой в #5", "evidence_ids": [5], "checked_range": None}
@@ -336,7 +336,7 @@ async def test_no_arbiter_without_failure_takes_top_step(database, fake_llm, dev
     assert _fallback_answer(c6, named, plain("10"))["answer"] == "4"
 
 
-async def test_driver_reason_keeps_failure_and_points_to_it(database, dev_records):
+async def test_driver_reason_keeps_failure_and_points_to_it(database, sample_records):
     criteria = [
         {
             "criterion_id": "c6", "title": "Ведение диалога", "max_points": 15.0, "earned_points": 10.5,
@@ -388,7 +388,9 @@ def test_holdout_files_match_checklist(default_config):
     gt = json.loads((BENCH_DIR / "holdout/gt_holdout.json").read_text(encoding="utf-8"))
     gt.pop("_legend")
     assert len(records) == 10 and {r["conversation_id"] for r in records} == set(gt)
-    dev = json.loads((BENCH_DIR.parent / "data/dev.json").read_text(encoding="utf-8"))["data"]["records"]
+    # Данных организаторов в чистом клоне нет, тогда сравнивать не с чем.
+    dev_file = BENCH_DIR.parent / "data/dev.json"
+    dev = json.loads(dev_file.read_text(encoding="utf-8"))["data"]["records"] if dev_file.exists() else []
     dev_lines = {t["text"] for r in dev for t in r["transcript"] if t["speaker"] == "operator"}
     for record in records:
         assert all(
@@ -397,3 +399,47 @@ def test_holdout_files_match_checklist(default_config):
     for labels in gt.values():
         for criterion in checklist.criteria:
             assert str(labels[criterion.id]).rstrip("?") in allowed_answers(criterion), labels
+
+
+def _opinion(answer):
+    return {"answer": answer, "reasoning": "[#1]", "evidence_ids": [1], "checked_range": None}
+
+
+def test_review_flag_only_when_arbiter_sides_with_nobody():
+    from app.judge import item_needs_review
+
+    judges = {"a": _opinion("20"), "b": _opinion("10")}
+    agree = {"answer": "10", "agreement": "arbitrated", "judge_answers": {**judges, "c (арбитр)": _opinion("10")}}
+    neither = {"answer": "15", "agreement": "arbitrated", "judge_answers": {**judges, "c (арбитр)": _opinion("15")}}
+    assert item_needs_review(agree) is False
+    assert item_needs_review(neither) is True
+    assert item_needs_review({"answer": "10", "agreement": "full", "judge_answers": judges}) is False
+    assert item_needs_review({"answer": "10", "agreement": "unresolved", "judge_answers": judges}) is True
+
+
+async def test_arbiter_siding_with_judge_needs_no_review(database, fake_llm, sample_records):
+    records = sample_records[:1]
+    checklist = await _prepare(records)
+    fake_llm.answers = {A_MODEL: {"c4": "20"}, B_MODEL: {"c4": "10"}, ARBITER_MODEL: {"c4": "10"}}
+    result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "ensemble")
+    view = repo.build_view(result["evaluation_id"])
+    item = next(c for c in view["original"]["criteria"] if c["criterion_id"] == "c4")
+    assert item["agreement"] == "arbitrated" and view["needs_review"] is False
+
+
+def test_startup_numbers_come_from_measurement_files(tmp_path, monkeypatch):
+    from app.routers import models
+
+    monkeypatch.setattr(models, "BENCH_DIR", tmp_path)
+    assert models.mode_info("local")["accuracy"] is None
+    (tmp_path / "results_single.json").write_text(
+        json.dumps({"accuracy": 91.5, "cost_per_dialog": 0.01, "dialogs": 12, "measured_at": "2026-11-08"}),
+        encoding="utf-8",
+    )
+    info = models.mode_info("single")
+    assert info["accuracy"] == 91.5 and info["dialogs"] == 12 and info["measured_at"] == "2026-11-08"
+    (tmp_path / "holdout").mkdir()
+    (tmp_path / "holdout/holdout_report.json").write_text(
+        json.dumps({"report": {"accuracy": 90.0, "dialogs": 10, "measured_at": "2026-11-08"}}), encoding="utf-8"
+    )
+    assert models.mode_info("ensemble")["holdout"]["dialogs"] == 10

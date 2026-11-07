@@ -9,9 +9,9 @@ import time
 from collections import defaultdict
 from typing import Any
 
-from . import asr, audio, export, ingest, jobs, repo
+from . import asr, audio, export, ingest, jobs, judge, repo
 from .config import BENCH_DIR, DATA_DIR, ROOT
-from .db import init_db, use_database
+from .db import connect, init_db, use_database
 from .scoring import compute_totals
 
 BENCH_MIN_ACCURACY = 95.0
@@ -178,6 +178,37 @@ def cmd_whisper(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_recheck_review(_args) -> int:
+    """Пересчитывает флаг «На проверку» у готовых оценок по текущему правилу. Модели не вызываются."""
+    changed = total = flagged = 0
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, needs_review, signals_json FROM evaluations WHERE status='ok'"
+        ).fetchall()
+        for row in rows:
+            items = conn.execute(
+                "SELECT answer, agreement, judge_answers_json FROM criterion_results WHERE evaluation_id=?",
+                (row["id"],),
+            ).fetchall()
+            notes = json.loads(row["signals_json"] or "{}").get("notes", [])
+            needs = any(any(m in note for m in judge.NOTE_MARKERS) for note in notes) or any(
+                judge.item_needs_review(
+                    {
+                        "answer": item["answer"], "agreement": item["agreement"],
+                        "judge_answers": json.loads(item["judge_answers_json"] or "{}"),
+                    }
+                )
+                for item in items
+            )
+            total += 1
+            flagged += int(needs)
+            if needs != bool(row["needs_review"]):
+                changed += 1
+                conn.execute("UPDATE evaluations SET needs_review=? WHERE id=?", (int(needs), row["id"]))
+    _log(f"Оценок {total}, на проверке {flagged}, изменено {changed}")
+    return 0
+
+
 def cmd_holdout(args) -> int:
     """Контрольный набор вне калибровки. Работает в отдельной базе data/holdout.sqlite."""
     records = json.loads((HOLDOUT_DIR / "holdout_chats.json").read_text(encoding="utf-8"))
@@ -188,7 +219,10 @@ def cmd_holdout(args) -> int:
     checklist = repo.get_checklist(args.checklist, args.version)
     job = asyncio.run(_evaluate(list(gt), checklist.id, checklist.version, args.mode, False))
     report = _bench_report(gt, checklist.id, checklist.version)
-    report.update(spent_usd=job["cost_usd"], mode=args.mode, checklist_version=checklist.version)
+    report.update(
+        spent_usd=job["cost_usd"], mode=args.mode, checklist_version=checklist.version,
+        dialogs=len(gt), measured_at=time.strftime("%Y-%m-%d"),
+    )
     doc = export.build_results(HOLDOUT_GROUP, checklist.id, checklist.version)
     problems = export.validate_results(doc, len(gt)) + export.check_against_data(doc, checklist)
     report["format_problems"] = problems
@@ -235,6 +269,8 @@ def cmd_bench(args) -> int:
     report["spent_usd"] = spent
     report["mode"] = args.mode
     report["checklist_version"] = checklist.version
+    report["dialogs"] = len(gt)
+    report["measured_at"] = time.strftime("%Y-%m-%d")
     if runs > 1:
         report["stability"] = _stability(snapshots)
     text = json.dumps(report, ensure_ascii=False, indent=2)
@@ -407,6 +443,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--force", action="store_true")
     p.add_argument("--repeat", type=int, default=1)
     p.set_defaults(func=cmd_bench)
+
+    p = sub.add_parser("recheck-review")
+    p.set_defaults(func=cmd_recheck_review)
 
     p = sub.add_parser("holdout")
     p.add_argument("--checklist", default=DEFAULT_CHECKLIST)

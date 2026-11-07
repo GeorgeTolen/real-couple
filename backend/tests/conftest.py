@@ -3,7 +3,7 @@ import json
 import pytest
 
 from app import db, llm
-from app.config import CHECKLISTS_DIR, DATA_DIR
+from app.config import BENCH_DIR, CHECKLISTS_DIR
 
 
 @pytest.fixture()
@@ -20,8 +20,9 @@ def default_config():
 
 
 @pytest.fixture()
-def dev_records():
-    return json.loads((DATA_DIR / "dev.json").read_text(encoding="utf-8"))["data"]["records"]
+def sample_records():
+    """Синтетические чаты. Данные организаторов в репозиторий не входят."""
+    return json.loads((BENCH_DIR / "holdout" / "holdout_chats.json").read_text(encoding="utf-8"))
 
 
 DEFAULT_ANSWERS = {"c1": "Y", "c2": "Y", "c3": "NA", "c4": "20", "c5": "Y", "c6": "10", "c7": "Y", "c8": "N"}

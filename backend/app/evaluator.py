@@ -81,8 +81,7 @@ async def evaluate_conversation(
         if reused:
             outcome.criteria = {**reused, **outcome.criteria}
             outcome.needs_review = outcome.needs_review or any(
-                item["agreement"] in (judge.AGREEMENT_ARBITRATED, judge.AGREEMENT_FALLBACK)
-                for item in reused.values()
+                judge.item_needs_review(item) for item in reused.values()
             )
             signals["reused_criteria"] = sorted(reused)
         _fill_checked_range(outcome.criteria, checklist, channel, turns)

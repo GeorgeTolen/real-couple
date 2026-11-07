@@ -6,7 +6,7 @@ import {
   CheckmarkCircle20Regular, DismissCircle20Regular, Play20Regular, Stop20Regular,
 } from '@fluentui/react-icons'
 import { Link, useLocation } from 'react-router-dom'
-import { api, type ChecklistListItem, type Job, type ModelsInfo, type ResultsPreview } from '../api'
+import { api, type ChecklistListItem, type Job, type Measurement, type ModelsInfo, type ResultsPreview } from '../api'
 import { ErrorBox, Segments } from '../components/common'
 import { CHANNEL, MODE, clock, money, score } from '../format'
 
@@ -77,6 +77,12 @@ function ExportPanel({ checklistId, version, group }: { checklistId: string; ver
       ))}
     </div>
   )
+}
+
+function measured(item?: Measurement): string {
+  if (item?.accuracy == null) return 'нет замера'
+  const value = item.accuracy.toFixed(1).replace('.', ',')
+  return `${value}%, замер на ${item.dialogs ?? '?'} диалогах, ${item.measured_at ?? 'дата неизвестна'}`
 }
 
 export default function RunPage() {
@@ -271,11 +277,14 @@ export default function RunPage() {
                     <div className="small muted">
                       {value === 'local' && !localAvailable
                         ? 'Локальный сервер не запущен'
-                        : `Цена: ${info ? money(info.cost_per_dialog) : '—'} за диалог`}
+                        : `Цена: ${info?.cost_per_dialog != null ? money(info.cost_per_dialog) : 'нет замера'} за диалог`}
                     </div>
                     <div className="small muted">
-                      Точность: {info?.accuracy ? `${info.accuracy}% на тестовом наборе` : 'см. README'}
+                      Точность: {measured(info)}
                     </div>
+                    {info?.holdout?.accuracy != null && (
+                      <div className="small muted">Контрольный набор: {measured(info.holdout)}</div>
+                    )}
                   </button>
                 )
               })}
@@ -288,7 +297,7 @@ export default function RunPage() {
           </div>
 
           <div className="success">
-            Оценка стоимости: {planned} диалогов ≈ {price !== undefined ? money(planned * price, 2) : '—'}
+            Оценка стоимости: {planned} диалогов ≈ {price != null ? money(planned * price, 2) : '—'}
           </div>
           <ErrorBox message={error} />
           {notice && <div className="success">{notice}</div>}
