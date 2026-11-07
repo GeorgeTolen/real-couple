@@ -21,7 +21,8 @@ BASE_RULES = """Ты эксперт отдела контроля качеств
 - evidence_ids: номера реплик, подтверждающих вывод.
 - checked_range: если действие пропущено, укажи [первый, последний] номер проверенного участка разговора. В остальных случаях оставь пустой массив.
 - reasoning: не больше трёх коротких предложений. При N/A назови причину неприменимости.
-- answer: Y значит Да, N значит Нет, NA значит N/A. Для шкалы выбери ровно одну ступень."""
+- answer: Y значит Да, N значит Нет, NA значит N/A. Для шкалы выбери ровно одну ступень.
+- Если для шкалы ставишь не максимальную ступень, в reasoning назови конкретный сбой с номером реплики в виде #N. Если такого сбоя нет, ставь максимальную ступень."""
 
 
 def _criterion_block(criterion: Criterion) -> str:
@@ -54,6 +55,9 @@ def build_system_prompt(
     checklist: Checklist, channel: str | None, only: list[str] | None = None
 ) -> str:
     parts = [BASE_RULES]
+    note = checklist.channel_notes.get(channel or "")
+    if note:
+        parts.append(f"Особенности канала: {note}")
     if checklist.general_rules:
         parts.append("Общие правила чек-листа:\n" + "\n".join(f"- {r}" for r in checklist.general_rules))
     blocks = [
@@ -119,7 +123,9 @@ def build_arbiter_prompt(user_prompt: str, disputes: dict[str, dict[str, dict[st
         user_prompt,
         "",
         "Судьи разошлись во мнениях. Ты арбитр: проверь транскрипт сам и вынеси своё решение "
-        "только по перечисленным критериям. Мнения судей могут быть ошибочными.",
+        "только по перечисленным критериям. Мнения судей могут быть ошибочными. "
+        "Для шкалы выбери ступень, назвав конкретный сбой с номером реплики #N. "
+        "Если конкретного сбоя нет, выбери максимальную ступень.",
     ]
     for criterion_id, opinions in disputes.items():
         lines.append(f"\nКритерий {criterion_id}:")

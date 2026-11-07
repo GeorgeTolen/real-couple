@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECKLISTS_DIR = ROOT / "checklists"
 DATA_DIR = ROOT / "data"
 AUDIO_DIR = DATA_DIR / "audio"
+WHISPER_DIR = DATA_DIR / "whisper"
 RESULTS_DIR = ROOT / "results"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 BENCH_DIR = ROOT / "bench"
@@ -31,6 +32,9 @@ class Settings(BaseSettings):
     db_path: str = "data/cqa.sqlite"
     team_name: str = "real-couple"
     ffmpeg_bin: str = "ffmpeg"
+    whisper_model: str = "large-v3"
+    whisper_device: str = "auto"
+    whisper_compute_type: str = "float16"
 
     @property
     def db_file(self) -> Path:

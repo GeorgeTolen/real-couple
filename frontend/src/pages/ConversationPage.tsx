@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button, Field, OverlayDrawer, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeaderTitle, Input, Radio,
-  RadioGroup, Tab, TabList, Textarea,
+  RadioGroup, Switch, Tab, TabList, Textarea,
 } from '@fluentui/react-components'
 import {
   ArrowClockwise20Regular, ChevronDown16Regular, ChevronRight16Regular, Dismiss24Regular, Flag20Regular,
@@ -9,7 +9,8 @@ import {
 } from '@fluentui/react-icons'
 import { Link, useParams } from 'react-router-dom'
 import {
-  api, waitForJob, type ConversationCard, type CriterionResult, type Evaluation, type SpeechMetrics, type Turn,
+  api, waitForJob, type ConversationCard, type CriterionResult, type Evaluation, type EvaluationDiff,
+  type SpeechMetrics, type Turn, type WhisperStatus,
 } from '../api'
 import { AgreementDots, AnswerBadge, ErrorBox, Loading, ScaleBar } from '../components/common'
 import {
@@ -438,6 +439,10 @@ export default function ConversationPage() {
   const [activeTurn, setActiveTurn] = useState<number | null>(null)
   const [playing, setPlaying] = useState<number | null>(null)
   const [progress, setProgress] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [diff, setDiff] = useState<EvaluationDiff | null>(null)
+  const [whisper, setWhisper] = useState<WhisperStatus | null>(null)
+  const [showWhisper, setShowWhisper] = useState(true)
   const seekRef = useRef<((t: number) => void) | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -452,7 +457,38 @@ export default function ConversationPage() {
     }
   }, [id])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    // Без сброса при переходе между диалогами на экране на миг остаётся чужая оценка.
+    setCard(null)
+    setEvaluation(null)
+    setNotice(null)
+    setDiff(null)
+    setWhisper(null)
+    setOpen(null)
+    void load()
+  }, [load])
+
+  const channel = card?.channel
+  useEffect(() => {
+    if (channel !== 'voice call') return
+    let live = true
+    let timer: number | undefined
+    const tick = async () => {
+      try {
+        const data = await api.whisper(id)
+        if (!live) return
+        setWhisper(data)
+        if (data.status === 'running') timer = window.setTimeout(tick, 3000)
+      } catch {
+        if (live) setWhisper(null)
+      }
+    }
+    void tick()
+    return () => {
+      live = false
+      window.clearTimeout(timer)
+    }
+  }, [id, channel, whisper?.status])
 
   const final = evaluation?.final ?? null
   const criteria = useMemo(() => final?.criteria ?? [], [final])
@@ -494,19 +530,30 @@ export default function ConversationPage() {
     setPlaying(current)
   }, [card])
 
-  const reevaluate = async () => {
+  const reevaluate = async (force: boolean) => {
     if (!card) return
     setError(null)
-    setProgress('Идёт оценка...')
+    setNotice(null)
+    setDiff(null)
+    setProgress(force ? 'Идёт пересчёт моделями...' : 'Идёт оценка...')
+    const previousId = evaluation?.id
     try {
       const { job_id } = await api.run({
         conversation_ids: [card.id],
         checklist_id: evaluation?.checklist_id ?? 'freedom-default',
         mode: evaluation?.mode ?? 'ensemble',
-        no_cache: Boolean(evaluation),
+        force,
       })
-      await waitForJob(job_id)
+      const job = await waitForJob(job_id)
       await load()
+      const result = job.recent[0]
+      if (result?.status === 'error') setError(result.error ?? 'Оценка не удалась')
+      if (result?.unchanged) {
+        setNotice('Оценка не изменилась: для этой версии чек-листа результат уже есть. Модели не вызывались.')
+      }
+      if (force && previousId && result?.evaluation_id) {
+        setDiff(await api.diff(result.evaluation_id, previousId))
+      }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -543,10 +590,20 @@ export default function ConversationPage() {
               appearance="primary"
               icon={<ArrowClockwise20Regular />}
               disabled={Boolean(progress)}
-              onClick={reevaluate}
+              onClick={() => reevaluate(false)}
             >
               {evaluation ? 'Переоценить' : 'Оценить'}
             </Button>
+            {evaluation?.status === 'ok' && (
+              <Button
+                appearance="subtle"
+                disabled={Boolean(progress)}
+                title="Заново спросить модели. Это платно, результат может отличаться."
+                onClick={() => reevaluate(true)}
+              >
+                Пересчитать заново
+              </Button>
+            )}
           </div>
         </div>
         <div className="facts">
@@ -568,6 +625,26 @@ export default function ConversationPage() {
       </div>
 
       <ErrorBox message={error} />
+      {notice && <div className="success">{notice}</div>}
+      {diff && (
+        <div className="card pad stack">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h3>
+              Что изменилось при пересчёте:{' '}
+              <span className="mono">{score(diff.old_total)} → {score(diff.new_total)}</span>
+            </h3>
+            <Button size="small" appearance="subtle" onClick={() => setDiff(null)}>Скрыть</Button>
+          </div>
+          {diff.changes.length === 0 && <div className="muted">Ответы по всем критериям совпали.</div>}
+          {diff.changes.map((change) => (
+            <div key={change.criterion_id} className="diff-row">
+              <b>{change.title}: {answerLabel(change.old_answer)} → {answerLabel(change.new_answer)}</b>
+              <div className="small"><span className="muted">Было: </span>{change.old_reasoning}</div>
+              <div className="small"><span className="muted">Стало: </span>{change.new_reasoning}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="columns">
         <div className="column">
@@ -585,8 +662,37 @@ export default function ConversationPage() {
           <div className="card panel">
             <div className="panel-head">
               <h2>Транскрипт</h2>
-              <span className="muted small">реплик: {card.turns.length}</span>
+              <div className="row">
+                {isCall && whisper?.status === 'ready' && (
+                  <Switch
+                    label="Whisper рядом"
+                    checked={showWhisper}
+                    onChange={(_, data) => setShowWhisper(data.checked)}
+                  />
+                )}
+                {isCall && card.has_audio && whisper?.available && whisper.status !== 'ready' && (
+                  <Button
+                    size="small"
+                    disabled={whisper.status === 'running'}
+                    onClick={() => {
+                      api.startWhisper(card.id).then(setWhisper).catch((e: Error) => setError(e.message))
+                    }}
+                  >
+                    {whisper.status === 'running' ? 'Идёт распознавание...' : 'Перераспознать запись'}
+                  </Button>
+                )}
+                <span className="muted small">реплик: {card.turns.length}</span>
+              </div>
             </div>
+            {isCall && (
+              <div className="small muted transcript-note">
+                Расшифровка предоставлена организаторами, возможны ошибки распознавания.
+                {whisper?.status === 'error' && ` Whisper: ${whisper.error}`}
+                {whisper?.status === 'ready' && showWhisper && (
+                  ` Whisper ${whisper.model} работает на этом компьютере и на оценку не влияет. В его тексте могут быть данные, скрытые организаторами.`
+                )}
+              </div>
+            )}
             <div className="transcript-wrap">
               <div className="scroll" ref={scroller}>
                 {card.turns.map((turn) => {
@@ -612,7 +718,16 @@ export default function ConversationPage() {
                       <span className="who">
                         {turn.speaker === 'operator' ? card.operator ?? SPEAKER.operator : SPEAKER[turn.speaker] ?? turn.speaker}
                       </span>
-                      <span className="text">{turn.text}</span>
+                      <span className="text">
+                        {turn.duplicate_of ? (
+                          <span className="dup">
+                            {turn.text} <span className="badge plain">дубль распознавания #{turn.duplicate_of}</span>
+                          </span>
+                        ) : turn.text}
+                        {showWhisper && whisper?.turns?.[String(turn.n)] && (
+                          <span className="whisper-line"><b>Whisper:</b> {whisper.turns[String(turn.n)]}</span>
+                        )}
+                      </span>
                     </div>
                   )
                 })}

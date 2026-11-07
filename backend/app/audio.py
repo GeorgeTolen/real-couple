@@ -113,7 +113,7 @@ def tempo_without_silence(turns: list[dict], silences: list[dict[str, float]]) -
     """Темп оператора по записи: из времени до следующей реплики вычитается найденная тишина."""
     spoken = [
         t for t in add_audio_time(turns)
-        if t["speaker"] in ("operator", "client") and t["t_audio"] is not None
+        if t["speaker"] in ("operator", "client") and t["t_audio"] is not None and not t.get("duplicate_of")
     ]
     words, seconds = 0, 0.0
     for current, following in zip(spoken, spoken[1:]):
@@ -134,7 +134,10 @@ def tempo_without_silence(turns: list[dict], silences: list[dict[str, float]]) -
 
 def transcript_metrics(turns: list[dict]) -> dict[str, Any]:
     """Оценка по меткам времени транскрипта. Длительность реплики: время до следующей реплики."""
-    spoken = [t for t in turns if t["speaker"] in ("operator", "client") and t["t_sec"] is not None]
+    spoken = [
+        t for t in turns
+        if t["speaker"] in ("operator", "client") and t["t_sec"] is not None and not t.get("duplicate_of")
+    ]
     operator_words = client_words = timed_words = 0
     operator_seconds = 0.0
     interruptions = 0

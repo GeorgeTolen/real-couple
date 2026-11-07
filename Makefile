@@ -10,7 +10,7 @@ ROOT_PY := $(PY)
 
 GROUP ?= DEV
 
-.PHONY: install run test build-front import bench evaluate-all export-dev validate-dev prod rehearsal
+.PHONY: install-whisper whisper install run test build-front import bench evaluate-all export-dev validate-dev prod rehearsal
 
 install:
 	python -m venv .venv
@@ -39,6 +39,12 @@ export-dev:
 
 validate-dev:
 	cd backend && $(PY) -m app.cli validate --set dev --expect 65
+
+install-whisper:
+	$(ROOT_PY) -m pip install -r backend/requirements-whisper.txt
+
+whisper:
+	cd backend && $(PY) -m app.cli whisper
 
 # Час контроля: импорт, оценка, экспорт, проверка, коммит и пуш results/prod/results.json.
 prod:

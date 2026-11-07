@@ -28,17 +28,32 @@ async def evaluate_conversation(
     checklist: Checklist,
     mode: str = "ensemble",
     models: dict[str, str] | None = None,
-    use_cache: bool = True,
+    force: bool = False,
     changed_only: bool = False,
 ) -> dict[str, Any]:
-    """changed_only берёт ответы прошлой версии по неизменённым критериям и не спрашивает о них модель."""
+    """Повтор отдаёт сохранённую оценку. force пересчитывает заново и сохраняет новую версию оценки.
+
+    changed_only берёт ответы прошлой версии чек-листа по неизменённым критериям.
+    """
     conversation = repo.get_conversation(conversation_id)
     channel = conversation["channel"]
     turns = conversation["turns"]
     version = prompt_version(checklist, channel)
     started = time.monotonic()
     signals: dict[str, Any] = {}
+    use_cache = not force
     try:
+        if not force:
+            same = repo.find_same_evaluation(
+                conversation, checklist, version, mode, judge.resolve_models(mode, models)
+            )
+            if same:
+                return {
+                    "conversation_id": conversation_id, "evaluation_id": same["id"], "status": "ok",
+                    "score": same["total_score"], "gross": bool(same["gross_violation"]),
+                    "needs_review": bool(same["needs_review"]), "cost_usd": 0.0, "spent_usd": 0.0,
+                    "latency_ms": 0, "unchanged": True,
+                }
         metrics = None
         if channel == "voice call":
             metrics = await audio.speech_metrics(conversation_id, conversation["audio_url"], turns)

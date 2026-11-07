@@ -72,7 +72,7 @@ async def run_job(
     version: int | None,
     mode: str,
     models: dict[str, str] | None = None,
-    use_cache: bool = True,
+    force: bool = False,
     on_result: Callable[[dict[str, Any]], None] | None = None,
     changed_only: bool = False,
 ) -> dict[str, Any]:
@@ -98,7 +98,7 @@ async def run_job(
             state["in_progress"] += 1
             save()
             result = await evaluator.evaluate_conversation(
-                conversation_id, checklist, mode, models, use_cache, changed_only
+                conversation_id, checklist, mode, models, force, changed_only
             )
             state["in_progress"] -= 1
             state["done"] += 1

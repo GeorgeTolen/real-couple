@@ -6,6 +6,7 @@ export type Turn = {
   t_sec: number | null
   t_audio?: number | null
   text: string
+  duplicate_of?: number | null
 }
 
 export type ScaleStep = { value: number; label: string }
@@ -34,6 +35,32 @@ export type CriterionResult = {
   decision_reason?: string | null
   original_answer?: string
   category?: string | null
+}
+
+export type EvaluationDiff = {
+  old_id: number | null
+  new_id: number
+  old_total: number | null
+  new_total: number | null
+  changes: {
+    criterion_id: string
+    title: string
+    old_answer: string
+    new_answer: string
+    old_reasoning: string
+    new_reasoning: string
+  }[]
+}
+
+export type WhisperStatus = {
+  status: 'none' | 'running' | 'ready' | 'error'
+  available: boolean
+  error?: string
+  model?: string
+  device?: string
+  match_ratio?: number
+  processing_sec?: number
+  turns?: Record<string, string>
 }
 
 export type ScoreDriver = {
@@ -212,6 +239,8 @@ export type Appeal = AppealBrief & {
 
 export type JobResult = {
   conversation_id: string
+  evaluation_id?: number
+  unchanged?: boolean
   status: string
   score: number | null
   gross: boolean
@@ -348,6 +377,9 @@ export const api = {
   conversation: (id: string) => request<ConversationCard>(`/conversations/${id}`),
   audioUrl: (id: string) => `api/conversations/${id}/audio`,
   audioMetrics: (id: string) => request<SpeechMetrics>(`/conversations/${id}/audio-metrics`),
+  whisper: (id: string) => request<WhisperStatus>(`/conversations/${id}/whisper`),
+  startWhisper: (id: string) => post<WhisperStatus>(`/conversations/${id}/whisper`),
+  diff: (id: number, against?: number) => request<EvaluationDiff>(`/evaluations/${id}/diff${query({ against })}`),
   datasets: () => request<{ group_id: string; total: number }[]>('/datasets'),
   importGroup: (group_id: string) => post<{ imported: number }>('/datasets/import', { group_id }),
   upload: (file: File, group_id: string) => {
@@ -369,7 +401,7 @@ export const api = {
     version?: number
     mode: string
     only_missing?: boolean
-    no_cache?: boolean
+    force?: boolean
     changed_only?: boolean
   }) => post<{ job_id: number; total: number }>('/evaluations/run', body),
   evaluation: (id: number) => request<Evaluation>(`/evaluations/${id}`),

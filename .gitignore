@@ -11,3 +11,4 @@ data/audio/
 tools/
 *.log
 data/rehearsal/
+data/whisper/

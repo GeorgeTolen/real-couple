@@ -1,5 +1,6 @@
 from app.audio import add_audio_time, extract_source_url, tempo_without_silence, transcript_metrics
-from app.normalize import extract_operator_name, normalize_transcript, render_for_prompt
+from app.asr import align_words_to_turns
+from app.normalize import extract_operator_name, mark_duplicates, normalize_transcript, render_for_prompt
 from app.signals import compute_signals
 
 
@@ -139,3 +140,72 @@ def test_transcript_metrics_share_and_tempo():
     metrics = transcript_metrics(turns)
     assert metrics["operator_share_pct"] == 71
     assert metrics["tempo_wpm"] == 120
+
+
+def _call(*rows):
+    return mark_duplicates(
+        add_audio_time(
+            normalize_transcript(
+                [{"timestamp": ts, "speaker": who, "text": text} for ts, who, text in rows]
+            )
+        )
+    )
+
+
+def test_duplicates_are_marked_without_renumbering():
+    turns = _call(
+        ("00:10", "client", "Я хотела спросить."),
+        ("00:10", "client", "Я хотела спросить."),
+        ("00:30", "client", "Я хотела спросить."),
+        ("00:31", "operator", "Я хотела спросить."),
+    )
+    assert [t["n"] for t in turns] == [1, 2, 3, 4]
+    assert [t["duplicate_of"] for t in turns] == [None, 1, None, None]
+    prompt = render_for_prompt("x", "voice call", "RU", turns)
+    assert "[#2] 00:10 client: (дубль #1)" in prompt
+    assert "[#3] 00:30 client: Я хотела спросить." in prompt
+
+
+def test_duplicates_do_not_inflate_speech_metrics():
+    base = [("00:00", "operator", "один два"), ("00:02", "client", "да да да")]
+    clean = transcript_metrics(_call(*base))
+    doubled = transcript_metrics(_call(base[0], base[1], ("00:02", "client", "да да да")))
+    assert doubled["operator_share_pct"] == clean["operator_share_pct"]
+
+
+def test_whisper_words_follow_organizer_turns():
+    turns = _call(
+        ("00:00", "operator", "Здравствуйте меня зовут [Имя скрыто] чем помочь"),
+        ("00:05", "client", "Хочу вывести деньги"),
+        ("00:05", "client", "Хочу вывести деньги"),
+        ("00:09", "operator", "Откройте раздел вывод"),
+    )
+    spoken = "Здравствуйте, меня зовут Мирас, чем помочь? Хочу вывести деньги. Откройте раздел вывод."
+    words = [{"word": w, "start": i * 0.9, "end": i * 0.9 + 0.5} for i, w in enumerate(spoken.split())]
+    text, ratio = align_words_to_turns(turns, words)
+    assert "Мирас" in text[1]
+    assert text[2] == "Хочу вывести деньги."
+    assert 3 not in text
+    assert text[4].startswith("Откройте")
+    assert ratio > 0.8
+
+
+def test_whisper_empty_input_is_safe():
+    turns = _call(("00:00", "operator", "Да"))
+    assert align_words_to_turns(turns, []) == ({}, 0.0)
+
+
+def test_whisper_distorted_short_turn_is_placed_by_time():
+    turns = _call(
+        ("00:00", "client", "Как вас зовут"),
+        ("00:04", "operator", "Пирас"),
+        ("00:08", "client", "Я не услышала"),
+    )
+    words = [
+        {"word": w, "start": start, "end": start + 0.4}
+        for w, start in [("Как", 0.1), ("вас", 0.5), ("зовут", 0.9), ("Мирас", 4.1), ("Я", 8.1), ("не", 8.4), ("услышала", 8.7)]
+    ]
+    text, _ = align_words_to_turns(turns, words)
+    assert text[1] == "Как вас зовут"
+    assert text[2] == "Мирас"
+    assert text[3] == "Я не услышала"

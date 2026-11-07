@@ -9,13 +9,14 @@ import time
 from collections import defaultdict
 from typing import Any
 
-from . import export, ingest, jobs, repo
+from . import asr, audio, export, ingest, jobs, repo
 from .config import BENCH_DIR, DATA_DIR, ROOT
 from .db import init_db
 from .scoring import compute_totals
 
 BENCH_MIN_ACCURACY = 95.0
 BENCH_MAX_MAE = 5.0
+BENCH_MIN_STABILITY = 98.0
 DEFAULT_CHECKLIST = "freedom-default"
 PROD_EXPECTED = 10
 
@@ -39,7 +40,7 @@ def _print_result(result: dict[str, Any]) -> None:
 
 
 async def _evaluate(ids: list[str], checklist_id: str, version: int | None, mode: str,
-                    only_missing: bool, no_cache: bool = False) -> dict[str, Any]:
+                    only_missing: bool, force: bool = False) -> dict[str, Any]:
     checklist = repo.get_checklist(checklist_id, version)
     ids = jobs.select_ids(ids, checklist.id, checklist.version, only_missing)
     _log(f"К оценке диалогов: {len(ids)}, чек-лист {checklist.id} v{checklist.version}, режим {mode}")
@@ -48,7 +49,7 @@ async def _evaluate(ids: list[str], checklist_id: str, version: int | None, mode
     )
     return await jobs.run_job(
         job_id, ids, checklist.id, checklist.version, mode,
-        use_cache=not no_cache, on_result=_print_result,
+        force=force, on_result=_print_result,
     )
 
 
@@ -69,7 +70,7 @@ def cmd_evaluate(args) -> int:
         _log("Нет диалогов для оценки. Сначала выполните import.")
         return 1
     job = asyncio.run(
-        _evaluate(ids, args.checklist, args.version, args.mode, args.only_missing, args.no_cache)
+        _evaluate(ids, args.checklist, args.version, args.mode, args.only_missing, args.force)
     )
     _log(f"Готово: {job['done']}, ошибок: {job['errors']}, потрачено ${job['cost_usd']:.4f}")
     return 1 if job["errors"] else 0
@@ -120,6 +121,61 @@ def _bench_report(gt: dict[str, dict[str, Any]], checklist_id: str, version: int
     }
 
 
+def _answers_snapshot(ids: list[str], checklist_id: str, version: int) -> dict[str, dict[str, str]]:
+    snapshot = {}
+    for conversation_id in ids:
+        evaluation_id = repo.latest_evaluation_id(conversation_id, checklist_id, version, only_ok=True)
+        if evaluation_id:
+            view = repo.build_view(evaluation_id)
+            snapshot[conversation_id] = {c["criterion_id"]: c["answer"] for c in view["original"]["criteria"]}
+    return snapshot
+
+
+def _stability(snapshots: list[dict[str, dict[str, str]]]) -> dict[str, Any]:
+    """Доля ответов, совпавших между соседними прогонами, и список расхождений."""
+    same = total = 0
+    per_criterion: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    changes = []
+    for previous, current in zip(snapshots, snapshots[1:]):
+        for conversation_id, answers in current.items():
+            for criterion_id, answer in answers.items():
+                before = previous.get(conversation_id, {}).get(criterion_id)
+                matched = before == answer
+                same += matched
+                total += 1
+                per_criterion[criterion_id][0] += matched
+                per_criterion[criterion_id][1] += 1
+                if not matched:
+                    changes.append(f"{conversation_id}/{criterion_id}: {before} и {answer}")
+    return {
+        "share": 100 * same / total if total else 0.0, "same": same, "total": total,
+        "per_criterion": {k: f"{100 * a / b:.0f}% ({a}/{b})" for k, (a, b) in sorted(per_criterion.items())},
+        "changes": changes,
+    }
+
+
+def cmd_whisper(args) -> int:
+    """Распознаёт записи звонков локально. Результат лежит в data/whisper и не попадает в git."""
+    ids = args.ids.split(",") if args.ids else [
+        cid for cid in repo.all_conversation_ids() if repo.get_conversation(cid)["audio_url"]
+    ]
+    failed = 0
+    for conversation_id in ids:
+        started = time.monotonic()
+        conversation = repo.get_conversation(conversation_id)
+        try:
+            result = asyncio.run(asr.run_for_conversation(conversation))
+            _log(
+                f"{conversation_id}: {result['device']}, запись {result['duration_sec']:.0f} с, "
+                f"совпало слов {result['match_ratio']:.0%}",
+                started,
+            )
+        except (asr.AsrError, audio.AudioError) as exc:
+            failed += 1
+            _log(f"{conversation_id}: ОШИБКА {exc}")
+    return 1 if failed else 0
+
+
 def cmd_bench(args) -> int:
     raw = (ROOT / args.gt).read_text(encoding="utf-8")
     gt = {k: v for k, v in json.loads(raw).items() if not k.startswith("_")}
@@ -127,11 +183,21 @@ def cmd_bench(args) -> int:
     if not repo.all_conversation_ids():
         _log("База пуста, сначала выполните import.")
         return 1
-    job = asyncio.run(_evaluate(list(gt), checklist.id, checklist.version, args.mode, False, args.no_cache))
+    runs = max(1, args.repeat)
+    # Повтор сравнивает настоящие ответы моделей, поэтому кеш при --repeat отключён.
+    force = args.force or runs > 1
+    spent = 0.0
+    snapshots: list[dict[str, dict[str, str]]] = []
+    for _ in range(runs):
+        job = asyncio.run(_evaluate(list(gt), checklist.id, checklist.version, args.mode, False, force))
+        spent += job["cost_usd"]
+        snapshots.append(_answers_snapshot(list(gt), checklist.id, checklist.version))
     report = _bench_report(gt, checklist.id, checklist.version)
-    report["spent_usd"] = job["cost_usd"]
+    report["spent_usd"] = spent
     report["mode"] = args.mode
     report["checklist_version"] = checklist.version
+    if runs > 1:
+        report["stability"] = _stability(snapshots)
     text = json.dumps(report, ensure_ascii=False, indent=2)
     print(text)
     (BENCH_DIR / f"results_{args.mode}.json").write_text(text, encoding="utf-8")
@@ -145,7 +211,14 @@ def cmd_bench(args) -> int:
         f"Точность {report['accuracy']:.1f}% (порог {BENCH_MIN_ACCURACY}), "
         f"MAE {report['mae']} (порог {BENCH_MAX_MAE}): {'ПРОЙДЕНО' if passed else 'НЕ ПРОЙДЕНО'}"
     )
-    return 0 if passed else 2
+    if not passed:
+        return 2
+    if runs > 1:
+        share = report["stability"]["share"]
+        _log(f"Совпадение между прогонами {share:.1f}% (цель {BENCH_MIN_STABILITY})")
+        if share < BENCH_MIN_STABILITY:
+            return 3
+    return 0
 
 
 def _export(args, set_name: str, group: str) -> dict[str, Any]:
@@ -284,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--checklist", default=DEFAULT_CHECKLIST)
     p.add_argument("--version", type=int)
     p.add_argument("--only-missing", action="store_true")
-    p.add_argument("--no-cache", action="store_true")
+    p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_evaluate)
 
     p = sub.add_parser("bench")
@@ -292,8 +365,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--mode", default="ensemble", choices=["single", "ensemble", "local"])
     p.add_argument("--checklist", default=DEFAULT_CHECKLIST)
     p.add_argument("--version", type=int)
-    p.add_argument("--no-cache", action="store_true")
+    p.add_argument("--force", action="store_true")
+    p.add_argument("--repeat", type=int, default=1)
     p.set_defaults(func=cmd_bench)
+
+    p = sub.add_parser("whisper")
+    p.add_argument("--ids")
+    p.set_defaults(func=cmd_whisper)
 
     p = sub.add_parser("export")
     p.add_argument("--set", required=True, choices=export.ALLOWED_SETS)

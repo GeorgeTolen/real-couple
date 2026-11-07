@@ -351,7 +351,7 @@ export default function RunPage() {
                           <td>{row.operator ?? <span className="muted">Не определён</span>}</td>
                           <td className="small">{CHANNEL[row.channel] ?? row.channel} · {row.language}</td>
                           <td className="mono right"><span className={`badge ${row.status !== 'ok' ? 'no' : (row.score ?? 0) < 50 ? 'no' : 'yes'}`}>{row.status === 'ok' ? score(row.score) : 'Ошибка'}</span></td>
-                          <td className="mono right">{clock(row.latency_ms / 1000)}</td>
+                          <td className="mono right">{row.unchanged ? 'готово ранее' : clock(row.latency_ms / 1000)}</td>
                         </tr>
                       ))}
                       {running && !job.recent.length && (

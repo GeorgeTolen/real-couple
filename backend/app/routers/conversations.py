@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from .. import audio, ingest, repo
+from .. import asr, audio, ingest, repo
 from ..db import connect
 from ..schemas import ImportRequest
 
@@ -132,6 +132,23 @@ async def get_audio(conversation_id: str):
     except audio.AudioError as exc:
         raise HTTPException(404, str(exc)) from exc
     return FileResponse(path, media_type="audio/mpeg", filename=f"{conversation_id}.mp3")
+
+
+@router.get("/conversations/{conversation_id}/whisper")
+def get_whisper(conversation_id: str):
+    repo.get_conversation(conversation_id)
+    return asr.status(conversation_id)
+
+
+@router.post("/conversations/{conversation_id}/whisper", status_code=202)
+async def start_whisper(conversation_id: str):
+    conversation = repo.get_conversation(conversation_id)
+    if not conversation["audio_url"]:
+        raise HTTPException(400, "У этого диалога нет записи")
+    try:
+        return asr.start(conversation)
+    except asr.AsrError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @router.get("/conversations/{conversation_id}/audio-metrics")

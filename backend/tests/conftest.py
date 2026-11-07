@@ -39,17 +39,22 @@ def fake_llm(monkeypatch):
     fake = Fake()
     fake.answers, fake.calls, fake.fail = {}, [], set()
     fake.category = "Раскрытие данных"
+    # Модель: сколько её ответов ещё придут без ссылки на реплику и без доказательств.
+    fake.no_ref = {}
 
     async def chat_json(*, provider, model, system, user, schema, validator=None, use_cache=True):
         fake.calls.append({"model": model, "system": system, "user": user, "schema": schema})
         if model in fake.fail:
             raise llm.LLMError(f"{model}: недоступна")
         chosen = {**DEFAULT_ANSWERS, **fake.answers.get(model, {})}
+        plain = fake.no_ref.get(model, 0) > 0
+        if plain:
+            fake.no_ref[model] -= 1
         data = {
             cid: {
-                "evidence_ids": [1],
+                "evidence_ids": [] if plain else [1],
                 "checked_range": [],
-                "reasoning": f"Вывод {model} по {cid}",
+                "reasoning": f"Вывод {model} по {cid}" if plain else f"Вывод {model} по {cid} [#1]",
                 "answer": chosen.get(cid, spec["properties"]["answer"]["enum"][0]),
                 **({"category": fake.category} if "category" in spec["properties"] else {}),
             }

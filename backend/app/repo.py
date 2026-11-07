@@ -1,10 +1,11 @@
 """Чтение и запись доменных сущностей. Исходная оценка неизменна, финальный слой считается из решений."""
 import json
+import re
 from typing import Any
 
 from .audio import add_audio_time
 from .db import connect, now_iso
-from .normalize import normalize_transcript
+from .normalize import mark_duplicates, normalize_transcript
 from .schemas import Checklist, Criterion
 from .scoring import allowed_answers, compute_totals, criteria_for_channel
 
@@ -27,7 +28,7 @@ def _conversation(row) -> dict[str, Any]:
     raw = json.loads(row["transcript_json"])
     turns = normalize_transcript(raw)
     if row["channel"] == "voice call":
-        turns = add_audio_time(turns)
+        turns = mark_duplicates(add_audio_time(turns))
     return {
         "id": row["id"],
         "channel": row["channel"],
@@ -307,33 +308,86 @@ def _view(row, rows: list[dict[str, Any]], appeals: list[dict[str, Any]]) -> dic
     }
 
 
-def first_sentence(text: str | None) -> str:
-    text = (text or "").strip()
-    for index, char in enumerate(text):
-        if char in ".!?" and (index + 1 == len(text) or text[index + 1] == " "):
-            return text[: index + 1]
-    return text
+def _failure_turn(reasoning: str, evidence: list[int]) -> int | None:
+    """Реплика со сбоем: первый номер в последнем предложении, где есть ссылка на реплику."""
+    for sentence in reversed(re.split(r"(?<=[.!?])\s+", reasoning or "")):
+        found = re.findall(r"#(\d+)", sentence)
+        if found:
+            return int(found[0])
+    return evidence[0] if evidence else None
 
 
 def score_drivers(criteria: list[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
-    """Критерии, сильнее всего снизившие итог: для блока «Почему снижена оценка»."""
+    """Критерии, снизившие итог из-за конкретного сбоя. Причина это текст reasoning целиком."""
     lost = []
     for item in criteria:
         if item["max_points"] is None or item["earned_points"] is None:
             continue
         points = round(item["max_points"] - item["earned_points"], 2)
-        if points > 0:
-            target = item["evidence_ids"][0] if item["evidence_ids"] else (
-                item["checked_range"][0] if item["checked_range"] else None
-            )
+        has_failure = "#" in (item["reasoning"] or "") or item["evidence_ids"]
+        if points > 0 and (has_failure or item["source"] == "reviewer"):
             lost.append(
                 {
                     "criterion_id": item["criterion_id"], "title": item["title"], "lost_points": points,
-                    "reason": first_sentence(item["reasoning"]), "turn": target,
+                    "reason": item.get("decision_reason") or item["reasoning"],
+                    "turn": _failure_turn(item["reasoning"], item["evidence_ids"]),
                 }
             )
     lost.sort(key=lambda row: -row["lost_points"])
     return lost[:limit]
+
+
+def find_same_evaluation(
+    conversation: dict[str, Any], checklist: Checklist, prompt_version: str, mode: str, models: dict[str, str]
+):
+    """Готовая оценка с теми же транскриптом, версией чек-листа, промптом и моделями."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, total_score, gross_violation, needs_review, models_json FROM evaluations "
+            "WHERE conversation_id=? AND transcript_hash=? AND checklist_id=? AND checklist_version=? "
+            "AND prompt_version=? AND mode=? AND status='ok' ORDER BY id DESC",
+            (conversation["id"], conversation["transcript_hash"], checklist.id, checklist.version,
+             prompt_version, mode),
+        ).fetchall()
+    for row in rows:
+        if json.loads(row["models_json"]) == models:
+            return row
+    return None
+
+
+def diff_evaluations(new_id: int, old_id: int | None = None) -> dict[str, Any]:
+    """Что изменилось между оценками: ответы, итог и объяснения обеих версий."""
+    new = build_view(new_id)
+    if old_id is None:
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM evaluations WHERE conversation_id=? AND checklist_id=? AND checklist_version=? "
+                "AND status='ok' AND id<? ORDER BY id DESC LIMIT 1",
+                (new["conversation_id"], new["checklist_id"], new["checklist_version"], new_id),
+            ).fetchone()
+        if not row:
+            return {"new_id": new_id, "old_id": None, "changes": [], "old_total": None,
+                    "new_total": new["original"]["total"] if new["original"] else None}
+        old_id = row["id"]
+    old = build_view(old_id)
+    if not new["original"] or not old["original"]:
+        raise ValueError("Сравнивать можно только успешные оценки")
+    before = {c["criterion_id"]: c for c in old["original"]["criteria"]}
+    changes = []
+    for item in new["original"]["criteria"]:
+        previous = before.get(item["criterion_id"])
+        if previous and previous["answer"] != item["answer"]:
+            changes.append(
+                {
+                    "criterion_id": item["criterion_id"], "title": item["title"],
+                    "old_answer": previous["answer"], "new_answer": item["answer"],
+                    "old_reasoning": previous["reasoning"], "new_reasoning": item["reasoning"],
+                }
+            )
+    return {
+        "new_id": new_id, "old_id": old_id, "changes": changes,
+        "old_total": old["original"]["total"], "new_total": new["original"]["total"],
+    }
 
 
 def gross_reasons(criteria: list[dict[str, Any]], turns: list[dict]) -> list[dict[str, Any]]:

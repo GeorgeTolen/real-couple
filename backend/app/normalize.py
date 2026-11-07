@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 HIDDEN_NAME = "[Имя скрыто]"
+DUPLICATE_WINDOW_SEC = 3
 _NAME = r"([A-ZА-ЯЁӘҒҚҢӨҰҮҺІ][a-zа-яёәғқңөұүһі]+)"
 _NAME_PATTERNS = [
     re.compile(r"[Мм]еня зовут\s+" + _NAME),
@@ -56,6 +57,25 @@ def normalize_transcript(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return turns
 
 
+def mark_duplicates(turns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Дубли распознавания: подряд, тот же спикер и текст, в пределах 3 с. Нумерация не меняется."""
+    result = []
+    for turn in turns:
+        previous = result[-1] if result else None
+        same = (
+            previous is not None
+            and previous["speaker"] == turn["speaker"]
+            and previous["text"].strip() == turn["text"].strip()
+            and turn["text"].strip() != ""
+            and previous["t_sec"] is not None
+            and turn["t_sec"] is not None
+            and abs(turn["t_sec"] - previous["t_sec"]) <= DUPLICATE_WINDOW_SEC
+        )
+        duplicate_of = (previous.get("duplicate_of") or previous["n"]) if same else None
+        result.append({**turn, "duplicate_of": duplicate_of})
+    return result
+
+
 def transcript_hash(raw: list[dict[str, Any]]) -> str:
     payload = json.dumps(raw, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -72,9 +92,8 @@ def render_for_prompt(conversation_id: str, channel: str, language: str, turns: 
     """Номер [#N] считается с 1 по исходному массиву: так же в карточке и в results.json."""
     lines = [f"conversation_id: {conversation_id} | канал: {channel} | язык: {language}"]
     for turn in turns:
-        lines.append(
-            f"[#{turn['n']}] {format_clock(turn['t_sec'])} {turn['speaker']}: {turn['text']}"
-        )
+        text = f"(дубль #{turn['duplicate_of']})" if turn.get("duplicate_of") else turn["text"]
+        lines.append(f"[#{turn['n']}] {format_clock(turn['t_sec'])} {turn['speaker']}: {text}")
     return "\n".join(lines)
 
 

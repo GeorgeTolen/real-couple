@@ -30,7 +30,7 @@ async def run_evaluation(request: RunRequest):
     job_id = jobs.create_job(params, len(ids))
     jobs.start_background(
         job_id, ids, checklist.id, checklist.version, request.mode, request.models,
-        use_cache=not request.no_cache, changed_only=request.changed_only,
+        force=request.force, changed_only=request.changed_only,
     )
     return {"job_id": job_id, "total": len(ids)}
 
@@ -61,6 +61,11 @@ def list_evaluations(
 @router.get("/evaluations/{evaluation_id}")
 def get_evaluation(evaluation_id: int):
     return repo.build_view(evaluation_id)
+
+
+@router.get("/evaluations/{evaluation_id}/diff")
+def diff(evaluation_id: int, against: int | None = None):
+    return repo.diff_evaluations(evaluation_id, against)
 
 
 @router.get("/evaluations/{evaluation_id}/preview")

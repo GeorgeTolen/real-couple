@@ -20,6 +20,7 @@ MAX_ATTEMPTS = 4
 MAX_REPAIRS = 2
 RETRY_STATUS = {402, 408, 409, 425, 429, 500, 502, 503, 504, 529}
 REASONING_EFFORT = "medium"
+SEED = 42
 
 _semaphores: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = (
     weakref.WeakKeyDictionary()
@@ -128,6 +129,7 @@ def _body(
         "model": model,
         "messages": messages,
         "temperature": 0,
+        "seed": SEED,
         "max_tokens": 16000,
     }
     if json_mode:

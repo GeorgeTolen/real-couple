@@ -139,6 +139,10 @@ table.grid th.right, table.grid td.right { text-align: right; }
 .turn.ev-no { background: var(--no-bg); box-shadow: inset 3px 0 0 var(--no); }
 .turn.ev-mid { background: var(--mid-bg); box-shadow: inset 3px 0 0 #e2a227; }
 .turn.ev-na { background: var(--na-bg); box-shadow: inset 3px 0 0 var(--na); }
+.dup { color: var(--text-3); }
+.whisper-line { display: block; margin-top: 3px; padding-left: 8px; border-left: 2px solid #7a9cc6; color: #2f5687; font-size: 13px; }
+.transcript-note { padding: 6px 16px; border-bottom: 1px solid var(--line); background: #fafaf7; }
+.diff-row { border-top: 1px solid var(--line); padding-top: 6px; }
 .turn.playing { outline: 2px solid var(--accent); outline-offset: -2px; }
 .turn.seekable { cursor: pointer; }
 .minimap { width: 10px; position: relative; border-left: 1px solid var(--line); background: var(--bg); flex: none; }

@@ -259,3 +259,94 @@ async def test_score_drivers_sorted_by_loss(database, fake_llm, dev_records):
     drivers = repo.build_view(result["evaluation_id"])["score_drivers"]
     assert [d["criterion_id"] for d in drivers] == ["c3", "c7"]
     assert drivers[0]["lost_points"] == 20 and drivers[0]["reason"] and drivers[0]["turn"] == 1
+
+
+A_MODEL, B_MODEL, ARBITER_MODEL = "google/gemini-3.8-flash", "openai/gpt-6.1-sol", "google/gemini-4-argon"
+
+
+async def test_repeat_returns_saved_evaluation_and_force_creates_new(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    conversation_id = records[0]["conversation_id"]
+    first = await evaluator.evaluate_conversation(conversation_id, checklist, "ensemble")
+    calls = len(fake_llm.calls)
+
+    again = await evaluator.evaluate_conversation(conversation_id, checklist, "ensemble")
+    assert again["unchanged"] is True and again["evaluation_id"] == first["evaluation_id"]
+    assert len(fake_llm.calls) == calls and again["spent_usd"] == 0
+
+    fake_llm.answers = {A_MODEL: {"c6": "7"}, B_MODEL: {"c6": "7"}}
+    forced = await evaluator.evaluate_conversation(conversation_id, checklist, "ensemble", force=True)
+    assert forced["evaluation_id"] != first["evaluation_id"] and "unchanged" not in forced
+    diff = repo.diff_evaluations(forced["evaluation_id"], first["evaluation_id"])
+    assert [c["criterion_id"] for c in diff["changes"]] == ["c6"]
+    assert diff["changes"][0]["old_answer"] == "10" and diff["changes"][0]["new_answer"] == "7"
+    assert diff["changes"][0]["old_reasoning"] and diff["changes"][0]["new_reasoning"]
+    assert repo.diff_evaluations(forced["evaluation_id"])["old_id"] == first["evaluation_id"]
+
+
+async def test_scale_below_top_without_failure_is_requested_again(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    fake_llm.answers = {A_MODEL: {"c6": "7"}}
+    fake_llm.no_ref = {A_MODEL: 1}
+    result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
+    assert fake_llm.calls[-1]["schema"]["required"] == ["c6"]
+    assert "Назови конкретный сбой" in fake_llm.calls[-1]["user"]
+    view = repo.build_view(result["evaluation_id"])
+    item = next(c for c in view["original"]["criteria"] if c["criterion_id"] == "c6")
+    assert "#1" in item["reasoning"] and item["answer"] == "7"
+    assert view["needs_review"] is False
+
+
+async def test_no_answer_without_evidence_follows_config(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    fake_llm.answers = {A_MODEL: {"c5": "N", "c3": "N"}}
+    fake_llm.no_ref = {A_MODEL: 1}
+    await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
+    # c5 требует доказательств по конфигурации, c3 нет.
+    assert fake_llm.calls[-1]["schema"]["required"] == ["c5"]
+
+
+async def test_failure_never_named_goes_to_review(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    fake_llm.answers = {A_MODEL: {"c6": "7"}}
+    fake_llm.no_ref = {A_MODEL: 2}
+    result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
+    view = repo.build_view(result["evaluation_id"])
+    assert view["needs_review"] is True
+    assert any("без конкретного сбоя" in note for note in view["signals"]["notes"])
+    # Снижение без сбоя не попадает в блок причин.
+    assert all(d["criterion_id"] != "c6" for d in view["score_drivers"])
+
+
+async def test_no_arbiter_without_failure_takes_top_step(database, fake_llm, dev_records):
+    """Правило «брать меньшее» убрано: без названного сбоя шкала не снижается."""
+    from app.judge import _fallback_answer
+
+    checklist = await _prepare(dev_records[:1])
+    c6 = checklist.criterion("c6")
+    plain = lambda answer: {"answer": answer, "reasoning": "Всё ясно", "evidence_ids": [], "checked_range": None}
+    named = {"answer": "4", "reasoning": "Сбой в #5", "evidence_ids": [5], "checked_range": None}
+    assert _fallback_answer(c6, plain("7"), plain("4"))["answer"] == "10"
+    assert _fallback_answer(c6, plain("10"), named)["answer"] == "4"
+    assert _fallback_answer(c6, named, plain("10"))["answer"] == "4"
+
+
+async def test_driver_reason_keeps_failure_and_points_to_it(database, dev_records):
+    criteria = [
+        {
+            "criterion_id": "c6", "title": "Ведение диалога", "max_points": 15.0, "earned_points": 10.5,
+            "reasoning": "Реплики ясные [#11]. Однако допущен сбой: сначала передача [#16], деталь вдогонку [#19].",
+            "evidence_ids": [11, 16, 19], "checked_range": None, "source": "ai",
+        },
+        {
+            "criterion_id": "c1", "title": "Контакт", "max_points": 10.0, "earned_points": 10.0,
+            "reasoning": "Всё хорошо", "evidence_ids": [], "checked_range": None, "source": "ai",
+        },
+    ]
+    drivers = repo.score_drivers(criteria)
+    assert len(drivers) == 1 and "сбой" in drivers[0]["reason"]
+    assert drivers[0]["turn"] == 16

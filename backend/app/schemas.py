@@ -40,6 +40,7 @@ class Criterion(BaseModel):
     guidance: str | None = None
     export_id: str | None = None
     categories: list[str] | None = None
+    evidence_required_on_no: bool = False
 
     @model_validator(mode="after")
     def _check(self):
@@ -73,6 +74,7 @@ class Checklist(BaseModel):
     sections: list[Section]
     criteria: list[Criterion]
     general_rules: list[str] = Field(default_factory=list)
+    channel_notes: dict[str, str] = Field(default_factory=dict)
     review_rules: list[ReviewRule] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -111,7 +113,7 @@ class RunRequest(BaseModel):
     mode: Literal["single", "ensemble", "local"] = "ensemble"
     models: dict[str, str] | None = None
     only_missing: bool = False
-    no_cache: bool = False
+    force: bool = False
     changed_only: bool = False
 
 

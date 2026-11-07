@@ -1,5 +1,6 @@
 """Судьи: одна модель, ансамбль с арбитром, локальная модель."""
 import asyncio
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,6 +14,7 @@ AGREEMENT_SINGLE = "single"
 AGREEMENT_FULL = "full"
 AGREEMENT_ARBITRATED = "arbitrated"
 AGREEMENT_FALLBACK = "unresolved"
+TURN_REF = re.compile(r"#\d+")
 
 
 @dataclass
@@ -127,14 +129,52 @@ def _forced_disputes(checklist: Checklist, opinions: list[dict[str, Any]]) -> se
     return forced
 
 
+def _names_failure(opinion: dict[str, Any]) -> bool:
+    return bool(TURN_REF.search(opinion["reasoning"] or "")) and bool(opinion["evidence_ids"])
+
+
 def _fallback_answer(criterion, first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
-    """Арбитр недоступен: для шкалы берётся меньшая ступень, для остального ответ судьи A."""
-    if criterion.type == "scale" and "NA" not in (first["answer"], second["answer"]):
-        return first if int(first["answer"]) <= int(second["answer"]) else second
-    return first
+    """Арбитр недоступен. Для шкалы верим судье с конкретным сбоем, без сбоя ставим верхнюю ступень."""
+    if criterion.type != "scale" or "NA" in (first["answer"], second["answer"]):
+        return first
+    top = str(max(s.value for s in criterion.scale or []))
+    candidates = [o for o in (first, second) if o["answer"] != top and _names_failure(o)]
+    if candidates:
+        return candidates[0]
+    holder = first if first["answer"] == top else second
+    return {**holder, "answer": top}
 
 
-async def _run_single(*, provider, model, system, user, schema, validator, use_cache, outcome):
+def inconsistent_criteria(answers: dict[str, dict[str, Any]], criteria: list) -> list[str]:
+    """Снижение без подтверждения: шкала без сбоя с номером реплики, «Нет» без доказательств."""
+    bad = []
+    for criterion in criteria:
+        item = answers.get(criterion.id)
+        if not item or item["answer"] == "NA":
+            continue
+        if criterion.type == "scale":
+            top = str(max(s.value for s in criterion.scale or []))
+            if item["answer"] != top and not _names_failure(item):
+                bad.append(criterion.id)
+        elif criterion.evidence_required_on_no and item["answer"] == "N" and not item["evidence_ids"]:
+            bad.append(criterion.id)
+    return bad
+
+
+def _repair_prompt(user: str, bad: list[str], answers: dict[str, dict[str, Any]]) -> str:
+    listed = "\n".join(
+        f"- {cid}: ответ {answers[cid]['answer']}, рассуждение: {answers[cid]['reasoning']}" for cid in bad
+    )
+    return (
+        f"{user}\n\nЭти ответы не подтверждены. Назови конкретный сбой с номером реплики #N "
+        f"и укажи реплику в evidence_ids или поставь максимальную ступень (для Да/Нет измени ответ):\n{listed}"
+    )
+
+
+async def _run_single(
+    *, provider, model, system, user, schema, validator, use_cache, outcome,
+    checklist=None, channel=None, n_turns=0, only=None,
+):
     result = await llm.chat_json(
         provider=provider,
         model=model,
@@ -145,7 +185,28 @@ async def _run_single(*, provider, model, system, user, schema, validator, use_c
         use_cache=use_cache,
     )
     outcome.add(result)
-    return result.data
+    answers = dict(result.data)
+    if checklist is None:
+        return answers
+    criteria = [c for c in criteria_for_channel(checklist, channel) if only is None or c.id in only]
+    bad = inconsistent_criteria(answers, criteria)
+    if bad:
+        repaired = await llm.chat_json(
+            provider=provider,
+            model=model,
+            system=build_system_prompt(checklist, channel, only=bad),
+            user=_repair_prompt(user, bad, answers),
+            schema=build_schema(checklist, channel, only=bad),
+            validator=make_validator(checklist, channel, n_turns, only=bad),
+            use_cache=use_cache,
+        )
+        outcome.add(repaired)
+        answers.update(repaired.data)
+        still = inconsistent_criteria(answers, criteria)
+        if still:
+            outcome.needs_review = True
+            outcome.notes.append(f"{model}: снижение без конкретного сбоя по {', '.join(still)}")
+    return answers
 
 
 async def judge_conversation(
@@ -168,6 +229,7 @@ async def judge_conversation(
     common = dict(
         system=system, user=user_prompt, schema=schema, validator=validator,
         use_cache=use_cache, outcome=outcome,
+        checklist=checklist, channel=channel, n_turns=n_turns, only=only,
     )
 
     if mode in ("single", "local"):
@@ -229,6 +291,10 @@ async def judge_conversation(
             validator=make_validator(checklist, channel, n_turns, only=disputed),
             use_cache=use_cache,
             outcome=outcome,
+            checklist=checklist,
+            channel=channel,
+            n_turns=n_turns,
+            only=disputed,
         )
     except llm.LLMError as exc:
         verdicts = None
