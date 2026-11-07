@@ -235,11 +235,18 @@ def cmd_prod(args) -> int:
         return 0
 
     path = export.write_results(doc, export.results_path("prod"))
-    steps = [
-        ("add", "results/prod/results.json"),
-        ("commit", "-m", f"results: control set {args.group}"),
-        ("push", "origin", "main"),
-    ]
+    added = _git("add", "results/prod/results.json")
+    if added.returncode != 0:
+        _log(f"git add не удался: {added.stderr or added.stdout}")
+        return 1
+    # Повторный запуск с теми же результатами не должен падать: коммитить просто нечего.
+    steps = [("push", "origin", "main")]
+    if _git("diff", "--cached", "--quiet", "--", "results/prod/results.json").returncode != 0:
+        steps.insert(
+            0,
+            ("commit", "-m", f"results: control set {args.group}",
+             "--", "results/prod/results.json"),
+        )
     for step in steps:
         done = _git(*step)
         if done.returncode != 0:

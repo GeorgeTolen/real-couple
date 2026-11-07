@@ -85,7 +85,7 @@ def extract_operator_name(turns: list[dict]) -> str | None:
             continue
         text = turn["text"]
         if HIDDEN_NAME in text:
-            return None
+            return HIDDEN_NAME.strip("[]")
         for pattern in _NAME_PATTERNS:
             match = pattern.search(text)
             if match:

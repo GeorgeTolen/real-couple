@@ -1,12 +1,12 @@
 export PYTHONUTF8 := 1
 
+# Абсолютный путь с прямыми слэшами работает и в cmd, и в sh.
 ifeq ($(OS),Windows_NT)
-PY := ../.venv/Scripts/python
-ROOT_PY := .venv/Scripts/python
+PY := "$(CURDIR)/.venv/Scripts/python.exe"
 else
-PY := ../.venv/bin/python
-ROOT_PY := .venv/bin/python
+PY := "$(CURDIR)/.venv/bin/python"
 endif
+ROOT_PY := $(PY)
 
 GROUP ?= DEV
 

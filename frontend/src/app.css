@@ -148,6 +148,8 @@ table.grid th.right, table.grid td.right { text-align: right; }
 .section-bar > div { background: var(--na-bg); border-radius: 1px; overflow: hidden; }
 .section-bar i { display: block; height: 100%; background: var(--accent); }
 .gross-banner { display: flex; gap: 8px; align-items: center; background: var(--no-bg); color: var(--no); padding: 8px 12px; border-radius: 6px; font-weight: 600; }
+.gross-banner svg { flex: none; }
+.badge.row { display: inline-flex; gap: 4px; }
 .crit { border-bottom: 1px solid var(--line); }
 .crit-row { display: grid; grid-template-columns: 20px minmax(120px, 1fr) 56px 94px 34px 62px; gap: 6px; align-items: center; padding: 7px 12px; cursor: pointer; }
 .crit-row:hover { background: #fafaf7; }
@@ -176,8 +178,14 @@ table.grid th.right, table.grid td.right { text-align: right; }
 .frag.hit { background: var(--yes-bg); }
 
 /* Редактор чек-листа */
-.editor { display: grid; grid-template-columns: 210px minmax(0, 1fr) 380px; gap: 12px; height: 100%; min-height: 0; }
+.editor { display: grid; grid-template-columns: 196px minmax(0, 1fr) 330px; gap: 12px; height: 100%; min-height: 0; }
 .editor > * { min-height: 0; overflow: auto; }
+.editor table.grid th, .editor table.grid td { padding: 6px; }
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.field-row.weight { grid-template-columns: minmax(0, 1fr) 84px; }
+.fui-Input, .fui-Select, .fui-Textarea { min-width: 0; max-width: 100%; }
+.fui-Input__input { min-width: 0; width: 100%; }
+.step-row .fui-Input { width: 100%; }
 .version-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
 .version-item:hover { background: var(--bg); }
 .version-item.on { background: var(--accent-soft); font-weight: 600; }
@@ -195,7 +203,8 @@ table.grid th.right, table.grid td.right { text-align: right; }
 
 /* Аналитика */
 .analytics { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; }
-.stack-row { display: grid; grid-template-columns: minmax(150px, 210px) 1fr 104px; gap: 10px; align-items: center; padding: 4px 0; }
+.stack-row { display: grid; grid-template-columns: minmax(150px, 210px) 1fr 136px; gap: 10px; align-items: center; padding: 4px 0; }
+.stack-row > .mono { white-space: nowrap; }
 .stack-bar { display: flex; height: 18px; border-radius: 2px; overflow: hidden; background: var(--na-bg); }
 .stack-bar i { display: block; height: 100%; }
 .legend { display: flex; gap: 14px; margin: 8px 0; font-size: 12px; }

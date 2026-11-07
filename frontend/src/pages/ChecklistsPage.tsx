@@ -64,8 +64,19 @@ function CriterionEditor({ draft, criterion, onChange, onClose, onDelete }: {
         <Button appearance="subtle" icon={<Dismiss16Regular />} aria-label="Закрыть" onClick={onClose} />
       </div>
       <Field label="Название" required>
-        <Input value={criterion.title} onChange={(_, data) => update({ title: data.value })} />
+        <Input
+          value={criterion.title}
+          onChange={(_, data) => {
+            // Новое название значит другой критерий: старый код сдачи к нему не относится.
+            update({ title: data.value, export_id: null })
+          }}
+        />
       </Field>
+      {!criterion.export_id && (
+        <div className="small muted">
+          Код для results.json не задан. Если это тот же критерий организаторов, выберите код ниже.
+        </div>
+      )}
       <TabList selectedValue={tab} onTabSelect={(_, data) => setTab(String(data.value))} size="small">
         <Tab value="all">Для всех каналов</Tab>
         <Tab value="voice">Для звонков</Tab>
@@ -89,8 +100,8 @@ function CriterionEditor({ draft, criterion, onChange, onClose, onDelete }: {
           </Field>
         </>
       )}
-      <div className="row">
-        <Field label="Тип ответа" className="grow">
+      <div className="field-row weight">
+        <Field label="Тип ответа">
           <Select
             value={criterion.type}
             onChange={(_, data) => setType(data.value as ChecklistCriterion['type'])}
@@ -100,7 +111,7 @@ function CriterionEditor({ draft, criterion, onChange, onClose, onDelete }: {
             <option value="flag">Флаг без баллов</option>
           </Select>
         </Field>
-        <Field label="Вес" style={{ width: 90 }}>
+        <Field label="Вес">
           <Input
             type="number"
             min={0}
@@ -159,13 +170,13 @@ function CriterionEditor({ draft, criterion, onChange, onClose, onDelete }: {
           )}
         </>
       )}
-      <div className="row">
-        <Field label="Секция" className="grow">
+      <div className="field-row">
+        <Field label="Секция">
           <Select value={criterion.section} onChange={(_, data) => update({ section: data.value })}>
             {draft.sections.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
           </Select>
         </Field>
-        <Field label="Канал" className="grow">
+        <Field label="Канал">
           <Select
             value={channelValue(criterion)}
             onChange={(_, data) => update({ channels: data.value === 'all' ? null : [data.value] })}

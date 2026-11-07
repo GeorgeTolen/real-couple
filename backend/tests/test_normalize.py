@@ -59,6 +59,7 @@ def test_hidden_name_counts_as_introduction():
     signals = compute_signals(_operator_says("Здравствуйте, меня зовут [Имя скрыто], чем могу помочь?"))
     assert signals["first_reply_has_name"] is True
     assert signals["first_reply_formal_greeting"] is True
+    assert extract_operator_name(_operator_says("Меня зовут [Имя скрыто].")) == "Имя скрыто"
 
 
 def test_kazakh_formal_greeting_is_not_informal():

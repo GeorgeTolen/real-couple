@@ -10,3 +10,4 @@ data/cqa.sqlite*
 data/audio/
 tools/
 *.log
+data/rehearsal/
