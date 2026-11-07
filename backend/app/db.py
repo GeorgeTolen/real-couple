@@ -158,6 +158,9 @@ def connect():
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        columns = {r["name"] for r in conn.execute("PRAGMA table_info(criterion_results)")}
+        if "category" not in columns:
+            conn.execute("ALTER TABLE criterion_results ADD COLUMN category TEXT")
         # Задачи прошлого запуска уже не выполняются: процесс завершён.
         conn.execute(
             "UPDATE jobs SET status='interrupted', in_progress=0, finished_at=? "

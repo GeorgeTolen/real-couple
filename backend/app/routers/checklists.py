@@ -1,16 +1,19 @@
 from fastapi import APIRouter, HTTPException
 
 from .. import export, repo
-from ..schemas import Checklist, Criterion
+from ..schemas import Checklist, Criterion, CriterionPatch
 
 router = APIRouter()
 
 
 def _card(checklist: Checklist) -> dict:
+    weight_sum = sum(c.weight for c in checklist.criteria)
     return {
         **checklist.model_dump(),
-        "weight_sum": sum(c.weight for c in checklist.criteria),
+        "weight_sum": weight_sum,
+        "weight_warning": None if weight_sum == 100 else f"Сумма весов {weight_sum:g}, а не 100",
         "missing_export_ids": export.missing_export_ids(checklist),
+        "official": export.is_official(checklist),
     }
 
 
@@ -39,6 +42,19 @@ def create_version(checklist_id: str, config: Checklist):
         raise HTTPException(400, "id в теле запроса не совпадает с адресом")
     repo.get_checklist(checklist_id)
     return _card(repo.save_new_version(config))
+
+
+@router.post("/checklists/{checklist_id}/criteria", status_code=201)
+def add_criterion(checklist_id: str, criterion: Criterion):
+    return _card(repo.add_criterion(checklist_id, criterion))
+
+
+@router.patch("/checklists/{checklist_id}/criteria/{criterion_id}")
+def patch_criterion(checklist_id: str, criterion_id: str, patch: CriterionPatch):
+    fields = patch.model_dump(exclude_unset=True)
+    if not fields:
+        raise HTTPException(400, "Нет полей для изменения")
+    return _card(repo.patch_criterion(checklist_id, criterion_id, fields))
 
 
 @router.post("/checklists/{checklist_id}/criteria/{criterion_id}/replace", status_code=201)

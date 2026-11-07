@@ -39,11 +39,14 @@ class Criterion(BaseModel):
     channel_overrides: dict[str, dict[str, Any]] = Field(default_factory=dict)
     guidance: str | None = None
     export_id: str | None = None
+    categories: list[str] | None = None
 
     @model_validator(mode="after")
     def _check(self):
         if not ID_RE.match(self.id):
             raise ValueError(f"Недопустимый id критерия: {self.id!r}")
+        if self.categories and self.type != "flag":
+            raise ValueError(f"Критерий {self.id}: типы нарушений задаются только у флага")
         if self.weight < 0:
             raise ValueError(f"Критерий {self.id}: вес не может быть отрицательным")
         if self.type == "scale":
@@ -109,6 +112,23 @@ class RunRequest(BaseModel):
     models: dict[str, str] | None = None
     only_missing: bool = False
     no_cache: bool = False
+    changed_only: bool = False
+
+
+class CriterionPatch(BaseModel):
+    """Частичная правка критерия: передаются только изменённые поля."""
+
+    title: str | None = None
+    section: str | None = None
+    type: Literal["binary", "scale", "flag"] | None = None
+    allow_na: bool | None = None
+    weight: float | None = None
+    description: str | None = None
+    na_condition: str | None = None
+    scale: list[ScaleStep] | None = None
+    channels: list[str] | None = None
+    guidance: str | None = None
+    export_id: str | None = None
 
 
 class AppealRequest(BaseModel):

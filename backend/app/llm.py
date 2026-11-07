@@ -15,7 +15,7 @@ from .db import connect, now_iso
 
 log = logging.getLogger("cqa.llm")
 
-TIMEOUT_SEC = 180
+TIMEOUT_SEC = 120
 MAX_ATTEMPTS = 4
 MAX_REPAIRS = 2
 RETRY_STATUS = {402, 408, 409, 425, 429, 500, 502, 503, 504, 529}

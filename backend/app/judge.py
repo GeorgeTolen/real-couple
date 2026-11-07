@@ -66,11 +66,19 @@ def make_validator(checklist: Checklist, channel: str | None, n_turns: int, only
                 raise ValueError(
                     f"критерий {criterion.id}: ответ {answer!r} недопустим, можно только {allowed}"
                 )
+            category = None
+            if criterion.categories and answer == "Y":
+                category = item.get("category")
+                if category not in criterion.categories:
+                    raise ValueError(
+                        f"критерий {criterion.id}: при ответе Y укажи category из {criterion.categories}"
+                    )
             cleaned[criterion.id] = {
                 "answer": answer,
                 "reasoning": str(item.get("reasoning") or ""),
                 "evidence_ids": _turn_numbers(item.get("evidence_ids"), n_turns),
                 "checked_range": _range(item.get("checked_range"), n_turns),
+                "category": category,
             }
         return cleaned
 
@@ -101,6 +109,7 @@ def _final(opinion: dict[str, Any], agreement: str, judges: dict[str, Any]) -> d
         "reasoning": opinion["reasoning"],
         "evidence_ids": opinion["evidence_ids"],
         "checked_range": opinion["checked_range"],
+        "category": opinion.get("category"),
         "agreement": agreement,
         "judge_answers": judges,
     }
@@ -148,11 +157,13 @@ async def judge_conversation(
     mode: str,
     models: dict[str, str] | None = None,
     use_cache: bool = True,
+    only: list[str] | None = None,
 ) -> JudgeOutcome:
+    """only ограничивает оценку перечисленными критериями: остальные берутся из прошлой оценки."""
     resolved = resolve_models(mode, models)
-    system = build_system_prompt(checklist, channel)
-    schema = build_schema(checklist, channel)
-    validator = make_validator(checklist, channel, n_turns)
+    system = build_system_prompt(checklist, channel, only=only)
+    schema = build_schema(checklist, channel, only=only)
+    validator = make_validator(checklist, channel, n_turns, only=only)
     outcome = JudgeOutcome(criteria={}, models=resolved)
     common = dict(
         system=system, user=user_prompt, schema=schema, validator=validator,

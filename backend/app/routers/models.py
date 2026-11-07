@@ -11,8 +11,8 @@ _cache: dict = {"at": 0.0, "cloud": None, "local": None}
 
 # Замеры бенчмарка на 12 диалогах DEV, docs/stage2-model-selection.md.
 BENCH = {
-    "ensemble": {"label": "Ансамбль: две модели и арбитр", "cost_per_dialog": 0.019, "accuracy": None},
-    "single": {"label": "Одна модель", "cost_per_dialog": 0.0089, "accuracy": 97.3},
+    "ensemble": {"label": "Ансамбль: две модели и арбитр", "cost_per_dialog": 0.024, "accuracy": 98.9},
+    "single": {"label": "Одна модель", "cost_per_dialog": 0.0089, "accuracy": 96.2},
     "local": {"label": "Локальная модель", "cost_per_dialog": 0.0, "accuracy": 91.1},
 }
 

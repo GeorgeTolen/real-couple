@@ -93,6 +93,7 @@ export default function RunPage() {
   const [version, setVersion] = useState<number | undefined>(state.version)
   const [mode, setMode] = useState<Mode>('ensemble')
   const [onlyMissing, setOnlyMissing] = useState(true)
+  const [changedOnly, setChangedOnly] = useState(true)
   const [models, setModels] = useState<ModelsInfo | null>(null)
   const [groups, setGroups] = useState<{ group_id: string; total: number }[]>([])
   const [job, setJob] = useState<Job | null>(null)
@@ -160,6 +161,7 @@ export default function RunPage() {
         version,
         mode,
         only_missing: onlyMissing,
+        changed_only: changedOnly,
       })
       poll(job_id)
     } catch (e) {
@@ -229,6 +231,11 @@ export default function RunPage() {
               label="Пропускать уже оценённые этой версией"
               checked={onlyMissing}
               onChange={(_, data) => setOnlyMissing(Boolean(data.checked))}
+            />
+            <Checkbox
+              label="Спрашивать модель только об изменённых критериях (быстрее и дешевле)"
+              checked={changedOnly}
+              onChange={(_, data) => setChangedOnly(Boolean(data.checked))}
             />
           </div>
 

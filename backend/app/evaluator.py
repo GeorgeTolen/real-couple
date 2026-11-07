@@ -29,7 +29,9 @@ async def evaluate_conversation(
     mode: str = "ensemble",
     models: dict[str, str] | None = None,
     use_cache: bool = True,
+    changed_only: bool = False,
 ) -> dict[str, Any]:
+    """changed_only берёт ответы прошлой версии по неизменённым критериям и не спрашивает о них модель."""
     conversation = repo.get_conversation(conversation_id)
     channel = conversation["channel"]
     turns = conversation["turns"]
@@ -42,15 +44,32 @@ async def evaluate_conversation(
             metrics = await audio.speech_metrics(conversation_id, conversation["audio_url"], turns)
         signals = compute_signals(turns, metrics)
         user_prompt = build_user_prompt(conversation_id, channel, conversation["language"], turns, signals)
-        outcome = await judge.judge_conversation(
-            checklist=checklist,
-            channel=channel,
-            user_prompt=user_prompt,
-            n_turns=len(turns),
-            mode=mode,
-            models=models,
-            use_cache=use_cache,
-        )
+        reused: dict[str, dict[str, Any]] = {}
+        reused_models: dict[str, str] = {}
+        found = repo.reusable_results(conversation, checklist, mode) if changed_only else None
+        if found:
+            reused, reused_models = found
+        pending = [c.id for c in criteria_for_channel(checklist, channel) if c.id not in reused]
+        if pending:
+            outcome = await judge.judge_conversation(
+                checklist=checklist,
+                channel=channel,
+                user_prompt=user_prompt,
+                n_turns=len(turns),
+                mode=mode,
+                models=models,
+                use_cache=use_cache,
+                only=pending if reused else None,
+            )
+        else:
+            outcome = judge.JudgeOutcome(criteria={}, models=reused_models)
+        if reused:
+            outcome.criteria = {**reused, **outcome.criteria}
+            outcome.needs_review = outcome.needs_review or any(
+                item["agreement"] in (judge.AGREEMENT_ARBITRATED, judge.AGREEMENT_FALLBACK)
+                for item in reused.values()
+            )
+            signals["reused_criteria"] = sorted(reused)
         _fill_checked_range(outcome.criteria, checklist, channel, turns)
         totals = compute_totals(
             checklist, {cid: item["answer"] for cid, item in outcome.criteria.items()}, channel

@@ -185,3 +185,39 @@ def test_upload_rejects_unsafe_id(client):
 def test_not_found(client):
     assert client.get("/api/conversations/none").status_code == 404
     assert client.get("/api/evaluations/999").status_code == 404
+
+
+def test_quick_checklist_edits_create_versions(client):
+    before = client.get("/api/checklists/freedom-default").json()
+    added = client.post(
+        "/api/checklists/freedom-default/criteria",
+        json={"id": "c9", "section": "start", "title": "Новый", "type": "binary", "weight": 5},
+    )
+    assert added.status_code == 201, added.text
+    body = added.json()
+    assert body["version"] == before["version"] + 1
+    assert body["weight_warning"] and body["official"] is False
+
+    patched = client.patch("/api/checklists/freedom-default/criteria/c9", json={"weight": 0, "title": "Переименован"})
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["version"] == before["version"] + 2
+    assert patched.json()["weight_warning"] is None
+    item = next(c for c in patched.json()["criteria"] if c["id"] == "c9")
+    assert item["title"] == "Переименован" and item["weight"] == 0
+
+    assert client.patch("/api/checklists/freedom-default/criteria/none", json={"weight": 1}).status_code == 404
+    assert client.patch("/api/checklists/freedom-default/criteria/c9", json={}).status_code == 400
+    assert client.post(
+        "/api/checklists/freedom-default/criteria",
+        json={"id": "c9", "section": "start", "title": "Дубль", "type": "binary", "weight": 5},
+    ).status_code == 400
+
+
+def test_gross_filter_returns_reasons(client, fake_llm, dev_records):
+    _upload(client, dev_records[:2])
+    fake_llm.answers = {A: {"c8": "Y"}}
+    fake_llm.category = "Оскорбление"
+    _run_and_wait(client, {"conversation_ids": [dev_records[0]["conversation_id"]], "mode": "single"})
+    rows = client.get("/api/conversations", params={"gross": True}).json()["items"]
+    assert [r["id"] for r in rows] == [dev_records[0]["conversation_id"]]
+    assert rows[0]["evaluation"]["gross_reasons"][0]["category"] == "Оскорбление"

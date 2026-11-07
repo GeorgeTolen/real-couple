@@ -177,7 +177,11 @@ def cmd_export(args) -> int:
         _log(f"Экспорт отклонён: {exc}")
         return 1
     expected = None if args.allow_partial else len(repo.group_conversation_ids(group))
-    if not _report_validation(export.validate_results(doc, expected)):
+    version = args.version or export.latest_exportable_version(args.checklist)
+    problems = export.validate_results(doc, expected)
+    if not problems:
+        problems = export.check_against_data(doc, repo.get_checklist(args.checklist, version))
+    if not _report_validation(problems):
         return 1
     path = export.write_results(doc, export.results_path(args.set))
     errors = sum(1 for r in doc["results"] if r["status"] == "error")
@@ -191,7 +195,11 @@ def cmd_validate(args) -> int:
         _log(f"Файла {path} нет")
         return 1
     doc = json.loads(path.read_text(encoding="utf-8"))
-    return 0 if _report_validation(export.validate_results(doc, args.expect)) else 1
+    problems = export.validate_results(doc, args.expect)
+    if not problems:
+        version = args.version or export.latest_exportable_version(args.checklist)
+        problems = export.check_against_data(doc, repo.get_checklist(args.checklist, version))
+    return 0 if _report_validation(problems) else 1
 
 
 def _git(*command: str) -> subprocess.CompletedProcess:
@@ -222,7 +230,10 @@ def cmd_prod(args) -> int:
         return 1
     _log("3/5 Результаты собраны", started)
 
-    if not _report_validation(export.validate_results(doc, expected)):
+    problems = export.validate_results(doc, expected)
+    if not problems:
+        problems = export.check_against_data(doc, repo.get_checklist(args.checklist, version))
+    if not _report_validation(problems):
         return 1
     errors = [r["conversation_id"] for r in doc["results"] if r["status"] == "error"]
     if errors:
@@ -295,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("validate")
     p.add_argument("--set", required=True, choices=export.ALLOWED_SETS)
     p.add_argument("--expect", type=int)
+    p.add_argument("--checklist", default=DEFAULT_CHECKLIST)
+    p.add_argument("--version", type=int)
     p.set_defaults(func=cmd_validate)
 
     p = sub.add_parser("prod")

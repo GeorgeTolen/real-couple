@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import { Input } from '@fluentui/react-components'
 import {
   ChatMultiple24Regular, ClipboardTaskListLtr24Regular, DataBarVertical24Regular, Flag24Regular,
-  Play24Regular, Search20Regular,
+  Play24Regular, Search20Regular, ShieldError24Regular,
 } from '@fluentui/react-icons'
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { readStorage, writeStorage } from './format'
@@ -11,6 +11,7 @@ import AppealsPage from './pages/AppealsPage'
 import ChecklistsPage from './pages/ChecklistsPage'
 import ConversationPage from './pages/ConversationPage'
 import ConversationsPage from './pages/ConversationsPage'
+import GrossPage from './pages/GrossPage'
 import RunPage from './pages/RunPage'
 
 export type Role = 'supervisor' | 'reviewer'
@@ -20,6 +21,7 @@ export const useRole = () => useContext(RoleContext)
 
 const NAV: { to: string; label: string; icon: ReactNode; end?: boolean }[] = [
   { to: '/', label: 'Диалоги', icon: <ChatMultiple24Regular />, end: true },
+  { to: '/gross', label: 'Грубые нарушения', icon: <ShieldError24Regular /> },
   { to: '/run', label: 'Оценка', icon: <Play24Regular /> },
   { to: '/checklists', label: 'Чек-листы', icon: <ClipboardTaskListLtr24Regular /> },
   { to: '/appeals', label: 'Апелляции', icon: <Flag24Regular /> },
@@ -28,6 +30,7 @@ const NAV: { to: string; label: string; icon: ReactNode; end?: boolean }[] = [
 
 function crumbs(path: string): string[] {
   if (path.startsWith('/conversations/')) return ['Диалоги', `Диалог ${path.split('/')[2]}`]
+  if (path.startsWith('/gross')) return ['Контроль качества', 'Грубые нарушения']
   if (path.startsWith('/run')) return ['Оценка', 'Запуск оценки']
   if (path.startsWith('/checklists')) return ['Настройка', 'Чек-листы']
   if (path.startsWith('/appeals')) return ['Контроль качества', 'Апелляции']
@@ -97,6 +100,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<ConversationsPage />} />
           <Route path="/conversations/:id" element={<ConversationPage />} />
+          <Route path="/gross" element={<GrossPage />} />
           <Route path="/run" element={<RunPage />} />
           <Route path="/checklists" element={<ChecklistsPage />} />
           <Route path="/appeals" element={<AppealsPage />} />

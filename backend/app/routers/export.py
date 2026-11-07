@@ -15,7 +15,11 @@ def _build(set_name: str, group_id: str | None, checklist_id: str, version: int 
     if not group:
         raise export.ExportError("Для набора prod укажите group_id")
     doc = export.build_results(group, checklist_id, version, allow_partial=allow_partial)
-    return doc, export.validate_results(doc, None if allow_partial else len(repo.group_conversation_ids(group)))
+    problems = export.validate_results(doc, None if allow_partial else len(repo.group_conversation_ids(group)))
+    if not problems:
+        used = version or export.latest_exportable_version(checklist_id)
+        problems = export.check_against_data(doc, repo.get_checklist(checklist_id, used))
+    return doc, problems
 
 
 @router.get("/export/results-json")

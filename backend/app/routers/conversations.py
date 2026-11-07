@@ -27,7 +27,7 @@ def _summary(conversation_id: str) -> dict[str, Any]:
         if final:
             evaluation.update(
                 total=view["original"]["total"], final_total=final["total"],
-                gross_violation=final["gross_violation"],
+                gross_violation=final["gross_violation"], gross_reasons=view["gross_reasons"],
                 criteria=[
                     {
                         "criterion_id": c["criterion_id"], "title": c["title"], "type": c["type"],

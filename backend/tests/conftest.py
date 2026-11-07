@@ -38,6 +38,7 @@ def fake_llm(monkeypatch):
 
     fake = Fake()
     fake.answers, fake.calls, fake.fail = {}, [], set()
+    fake.category = "Раскрытие данных"
 
     async def chat_json(*, provider, model, system, user, schema, validator=None, use_cache=True):
         fake.calls.append({"model": model, "system": system, "user": user, "schema": schema})
@@ -50,6 +51,7 @@ def fake_llm(monkeypatch):
                 "checked_range": [],
                 "reasoning": f"Вывод {model} по {cid}",
                 "answer": chosen.get(cid, spec["properties"]["answer"]["enum"][0]),
+                **({"category": fake.category} if "category" in spec["properties"] else {}),
             }
             for cid, spec in schema["properties"].items()
         }

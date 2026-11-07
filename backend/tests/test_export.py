@@ -173,3 +173,89 @@ async def test_ensemble_without_arbiter_takes_lower_scale(database, fake_llm, de
     assert by_id["c4"]["answer"] == "10" and by_id["c4"]["agreement"] == "unresolved"
     assert by_id["c5"]["answer"] == "Y"
     assert view["needs_review"] is True
+
+
+async def test_demo_edit_of_weight_does_not_reach_submission(database, fake_llm, dev_records):
+    """Правка веса на демо создаёт новую версию, но сдача остаётся на версии организаторов."""
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    changed = repo.patch_criterion(checklist.id, "c5", {"weight": 25})
+    assert export.is_official(checklist) is True
+    assert export.is_official(changed) is False
+    assert export.latest_exportable_version(checklist.id) == checklist.version
+
+
+async def test_check_against_data_catches_bad_turn_and_score(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
+    doc = export.build_results("DEV")
+    assert export.check_against_data(doc, checklist) == []
+
+    broken = copy.deepcopy(doc)
+    broken["results"][0]["criteria"][0]["evidence_turns"] = [9999]
+    assert any("9999" in p for p in export.check_against_data(broken, checklist))
+
+    broken = copy.deepcopy(doc)
+    broken["results"][0]["score"]["final_score"] = 1.0
+    assert any("пересчёт" in p for p in export.check_against_data(broken, checklist))
+
+    broken = copy.deepcopy(doc)
+    broken["results"][0]["conversation_id"] = "missing"
+    assert any("нет в импортированных" in p for p in export.check_against_data(broken, checklist))
+
+
+async def test_changed_only_asks_model_about_new_criterion_only(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    conversation_id = records[0]["conversation_id"]
+    await evaluator.evaluate_conversation(conversation_id, checklist, "single")
+    calls_before = len(fake_llm.calls)
+
+    # Вес на ответ модели не влияет: вызовов нет, итог пересчитан.
+    weight_only = repo.patch_criterion(checklist.id, "c5", {"weight": 25})
+    result = await evaluator.evaluate_conversation(conversation_id, weight_only, "single", changed_only=True)
+    assert result["status"] == "ok" and len(fake_llm.calls) == calls_before and result["cost_usd"] == 0
+
+    # Изменена формулировка одного критерия: модель спрашивают только о нём.
+    reworded = repo.patch_criterion(checklist.id, "c5", {"description": "Новая формулировка"})
+    result = await evaluator.evaluate_conversation(conversation_id, reworded, "single", changed_only=True)
+    assert result["status"] == "ok"
+    assert fake_llm.calls[-1]["schema"]["required"] == ["c5"]
+    view = repo.build_view(result["evaluation_id"])
+    assert view["signals"]["reused_criteria"] == ["c1", "c2", "c3", "c4", "c6", "c7", "c8"]
+    assert len(view["original"]["criteria"]) == 8
+
+
+async def test_gross_reason_has_category_and_quote(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    fake_llm.answers = {"google/gemini-3.8-flash": {"c8": "Y"}}
+    fake_llm.category = "Раскрытие данных"
+    result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
+    view = repo.build_view(result["evaluation_id"])
+    reason = view["gross_reasons"][0]
+    assert reason["category"] == "Раскрытие данных"
+    assert reason["turn"] == 1 and reason["quote"]
+
+
+async def test_gross_without_category_is_rejected_by_validator(database, dev_records):
+    from app.judge import make_validator
+    from app.schemas import Checklist
+
+    records = dev_records[:1]
+    checklist: Checklist = await _prepare(records)
+    validate = make_validator(checklist, "agent chat", 5, only=["c8"])
+    bad = {"c8": {"answer": "Y", "category": "нет", "reasoning": "", "evidence_ids": [], "checked_range": []}}
+    with pytest.raises(ValueError, match="category"):
+        validate(bad)
+
+
+async def test_score_drivers_sorted_by_loss(database, fake_llm, dev_records):
+    records = dev_records[:1]
+    checklist = await _prepare(records)
+    fake_llm.answers = {"google/gemini-3.8-flash": {"c3": "N", "c7": "N", "c5": "Y"}}
+    result = await evaluator.evaluate_conversation(records[0]["conversation_id"], checklist, "single")
+    drivers = repo.build_view(result["evaluation_id"])["score_drivers"]
+    assert [d["criterion_id"] for d in drivers] == ["c3", "c7"]
+    assert drivers[0]["lost_points"] == 20 and drivers[0]["reason"] and drivers[0]["turn"] == 1

@@ -30,7 +30,7 @@ async def run_evaluation(request: RunRequest):
     job_id = jobs.create_job(params, len(ids))
     jobs.start_background(
         job_id, ids, checklist.id, checklist.version, request.mode, request.models,
-        use_cache=not request.no_cache,
+        use_cache=not request.no_cache, changed_only=request.changed_only,
     )
     return {"job_id": job_id, "total": len(ids)}
 

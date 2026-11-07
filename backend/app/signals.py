@@ -105,7 +105,9 @@ def signals_to_text(signals: dict[str, Any]) -> str:
     if signals["escalation_to_operator_sec"] is not None:
         lines.append(
             f"- От эскалации (#{signals['escalation_n']}) до первой реплики оператора: "
-            f"{signals['escalation_to_operator_sec']} с."
+            f"{signals['escalation_to_operator_sec']} с. "
+            f"Порог первой реакции {FIRST_REACTION_SEC} с: "
+            f"{'превышен' if signals['escalation_to_operator_sec'] > FIRST_REACTION_SEC else 'не превышен'}."
         )
     pauses = signals["operator_pauses_over_60s"]
     if pauses:

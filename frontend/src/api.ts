@@ -33,6 +33,25 @@ export type CriterionResult = {
   source: string
   decision_reason?: string | null
   original_answer?: string
+  category?: string | null
+}
+
+export type ScoreDriver = {
+  criterion_id: string
+  title: string
+  lost_points: number
+  reason: string
+  turn: number | null
+}
+
+export type GrossReason = {
+  criterion_id: string
+  title: string
+  category: string | null
+  explanation: string
+  turn: number | null
+  quote: string | null
+  evidence_ids: number[]
 }
 
 export type SectionScore = { id: string; title: string; score: number | null; earned: number; max: number }
@@ -88,6 +107,8 @@ export type Evaluation = {
   decisions: Decision[]
   original: ScoreLayer | null
   final: ScoreLayer | null
+  score_drivers?: ScoreDriver[]
+  gross_reasons?: GrossReason[]
 }
 
 export type ConversationCard = {
@@ -130,6 +151,7 @@ export type ConversationRow = {
     total?: number | null
     final_total?: number | null
     gross_violation?: boolean
+    gross_reasons?: GrossReason[]
     criteria?: Pick<CriterionResult, 'criterion_id' | 'title' | 'type' | 'answer' | 'agreement' | 'scale'>[]
   } | null
 }
@@ -160,6 +182,8 @@ export type Checklist = {
   review_rules: { when_criterion: string; when_answer: string; dispute: string }[]
   weight_sum?: number
   missing_export_ids?: string[]
+  official?: boolean
+  weight_warning?: string | null
   versions?: { version: number; name: string; created_at: string }[]
   latest_version?: number
 }
@@ -346,6 +370,7 @@ export const api = {
     mode: string
     only_missing?: boolean
     no_cache?: boolean
+    changed_only?: boolean
   }) => post<{ job_id: number; total: number }>('/evaluations/run', body),
   evaluation: (id: number) => request<Evaluation>(`/evaluations/${id}`),
   evaluations: (params: Record<string, string | number | undefined>) =>

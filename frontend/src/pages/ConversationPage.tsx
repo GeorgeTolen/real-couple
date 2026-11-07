@@ -23,10 +23,31 @@ const TONE_COLOR: Record<Tone, string> = { yes: '#138a4e', no: '#d13b45', mid: '
 function pointsLabel(item: CriterionResult): string {
   if (item.answer === 'NA') return 'N/A'
   if (item.type === 'flag') return ''
-  if (item.type === 'scale') {
-    return `${item.answer} / ${Math.max(...item.scale.map((s) => s.value))}`
-  }
   return `${points(item.weighted_points)} / ${points(item.weight)}`
+}
+
+function stepLabel(item: CriterionResult): string | null {
+  if (item.type !== 'scale' || item.answer === 'NA') return null
+  return `${item.answer} из ${Math.max(...item.scale.map((s) => s.value))}`
+}
+
+function ScoreRing({ value }: { value: number | null }) {
+  const radius = 30
+  const circumference = 2 * Math.PI * radius
+  const share = Math.max(0, Math.min(100, value ?? 0)) / 100
+  return (
+    <div className="ring" role="img" aria-label={`Итог ${score(value)} из 100`}>
+      <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
+        <circle cx="38" cy="38" r={radius} fill="none" stroke="var(--na-bg)" strokeWidth="5" />
+        <circle
+          cx="38" cy="38" r={radius} fill="none" stroke={(value ?? 0) < 50 ? '#d13b45' : 'var(--accent)'}
+          strokeWidth="5" strokeLinecap="round" transform="rotate(-90 38 38)"
+          strokeDasharray={`${share * circumference} ${circumference}`}
+        />
+      </svg>
+      <span className="mono big-score">{score(value)}</span>
+    </div>
+  )
 }
 
 function CriterionRow({ item, open, onToggle, onJump }: {
@@ -47,7 +68,10 @@ function CriterionRow({ item, open, onToggle, onJump }: {
         <AnswerBadge item={item} answer={item.answer} />
         <ScaleBar item={item} answer={item.answer} />
         <AgreementDots agreement={item.agreement} />
-        <span className="pts">{pointsLabel(item)}</span>
+        <span className="pts">
+          {pointsLabel(item)}
+          {stepLabel(item) && <span className="step">{stepLabel(item)}</span>}
+        </span>
       </div>
       {open && (
         <div className="crit-body">
@@ -191,13 +215,19 @@ function AppealDrawer({ evaluation, operator, initial, onClose, onSaved }: {
 
 type Mark = { n: number; title: string; tone: Tone }
 
-function AudioPanel({ id, turns, marks, duration, seekRef, onTime }: {
+const LANES = [
+  { speaker: 'client', label: 'Клиент' },
+  { speaker: 'operator', label: 'Оператор' },
+]
+
+function AudioPanel({ id, turns, marks, duration, seekRef, onTime, playing }: {
   id: string
   turns: Turn[]
   marks: Mark[]
   duration: number
   seekRef: React.MutableRefObject<((t: number) => void) | null>
   onTime: (t: number) => void
+  playing: number | null
 }) {
   const audio = useRef<HTMLAudioElement>(null)
   const [time, setTime] = useState(0)
@@ -221,6 +251,20 @@ function AudioPanel({ id, turns, marks, duration, seekRef, onTime }: {
   }, [seek, seekRef])
 
   const at = (n: number) => turns.find((t) => t.n === n)?.t_audio ?? 0
+  const pct = (t: number) => (length ? Math.min(100, (t / length) * 100) : 0)
+  const laneOf = (n: number) => (turns.find((t) => t.n === n)?.speaker === 'client' ? 'client' : 'operator')
+  const spoken = turns.filter((t) => ['client', 'operator'].includes(t.speaker) && t.t_audio !== null && t.t_audio !== undefined)
+  // Конец реплики неизвестен: берём следующую реплику, но не больше времени на произнесение слов.
+  const segments = spoken.map((turn, index) => {
+    const start = turn.t_audio as number
+    const next = spoken[index + 1]?.t_audio ?? length
+    return {
+      n: turn.n,
+      speaker: turn.speaker,
+      start,
+      end: Math.min(next as number, start + 1 + turn.text.split(/\s+/).length * 0.5),
+    }
+  })
 
   return (
     <div className="card player">
@@ -238,26 +282,41 @@ function AudioPanel({ id, turns, marks, duration, seekRef, onTime }: {
           onTime(e.currentTarget.currentTime)
         }}
       />
-      <div
-        className="timeline"
-        onClick={(e) => {
-          const box = e.currentTarget.getBoundingClientRect()
-          seek(((e.clientX - box.left) / box.width) * length)
-        }}
-      >
-        <div className="track"><i style={{ width: `${length ? (time / length) * 100 : 0}%` }} /></div>
-        {marks.map((mark, index) => (
-          <button
-            key={`${mark.n}-${index}`}
-            className="mark"
-            title={`#${mark.n} ${mark.title}`}
-            style={{ left: `${length ? Math.min(100, (at(mark.n) / length) * 100) : 0}%`, background: TONE_COLOR[mark.tone] }}
-            onClick={(e) => { e.stopPropagation(); seek(at(mark.n)) }}
-          />
+      <div className="tracks">
+        {LANES.map((lane) => (
+          <div key={lane.speaker} className="lane-row">
+            <span className="lane-label small muted">{lane.label}</span>
+            <div
+              className="lane"
+              onClick={(e) => {
+                const box = e.currentTarget.getBoundingClientRect()
+                seek(((e.clientX - box.left) / box.width) * length)
+              }}
+            >
+              {segments.filter((s) => s.speaker === lane.speaker).map((s) => (
+                <i
+                  key={s.n}
+                  className={`segment ${lane.speaker} ${playing === s.n ? 'on' : ''}`}
+                  style={{ left: `${pct(s.start)}%`, width: `${Math.max(0.3, pct(s.end) - pct(s.start))}%` }}
+                />
+              ))}
+              {marks.filter((m) => laneOf(m.n) === lane.speaker).map((mark, index) => (
+                <button
+                  key={`${mark.n}-${index}`}
+                  className="mark"
+                  title={`#${mark.n} ${mark.title}`}
+                  style={{ left: `${pct(at(mark.n))}%`, background: TONE_COLOR[mark.tone] }}
+                  onClick={(e) => { e.stopPropagation(); seek(at(mark.n)) }}
+                />
+              ))}
+              <span className="playhead" style={{ left: `${pct(time)}%` }} />
+            </div>
+          </div>
         ))}
       </div>
       <div className="row small muted" style={{ justifyContent: 'space-between' }}>
         <span className="mono">{clock(time)}</span>
+        <span>Запись одноканальная, дорожки построены по транскрипту</span>
         <span className="mono">{clock(length)}</span>
       </div>
       {metrics && (
@@ -520,6 +579,7 @@ export default function ConversationPage() {
               duration={lastTime}
               seekRef={seekRef}
               onTime={onAudioTime}
+              playing={playing}
             />
           )}
           <div className="card panel">
@@ -573,7 +633,7 @@ export default function ConversationPage() {
         </div>
 
         <div className="column">
-          <div className="card panel">
+          <div className="card panel result-panel">
             {!evaluation ? (
               <div className="empty">Диалог ещё не оценён. Нажмите «Оценить».</div>
             ) : evaluation.status !== 'ok' || !final ? (
@@ -584,13 +644,14 @@ export default function ConversationPage() {
               <>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
                   <div className="row top" style={{ justifyContent: 'space-between', gap: 16 }}>
-                    <div>
-                      <div className="muted small">Итог по диалогу</div>
-                      <span className="big-score">{score(final.total)}</span>
-                      <span className="mono muted"> / 100</span>
-                      {changed && (
-                        <div className="small muted">Исходная авто-оценка: <span className="mono">{score(evaluation.original?.total)}</span></div>
-                      )}
+                    <div className="row">
+                      <ScoreRing value={final.total} />
+                      <div>
+                        <div className="muted small">Итог<br />из 100</div>
+                        {changed && (
+                          <div className="small muted">Исходная авто-оценка: <span className="mono">{score(evaluation.original?.total)}</span></div>
+                        )}
+                      </div>
                     </div>
                     <div className="grow">
                       <div className="row small" style={{ gap: 2 }}>
@@ -610,7 +671,32 @@ export default function ConversationPage() {
                   {final.gross_violation && (
                     <div className="gross-banner" style={{ marginTop: 8 }}>
                       <ShieldError20Regular />
-                      <span>Грубое нарушение: {grossItems[0]?.reasoning ?? grossItems[0]?.title}</span>
+                      <span>
+                        {evaluation.gross_reasons?.[0]?.category ?? 'Грубое нарушение'}: {grossItems[0]?.reasoning ?? grossItems[0]?.title}
+                      </span>
+                    </div>
+                  )}
+                  {Boolean(evaluation.score_drivers?.length) && (
+                    <div className="drivers">
+                      <h3>Почему снижена оценка</h3>
+                      {evaluation.score_drivers?.map((driver) => (
+                        <div key={driver.criterion_id} className="driver">
+                          <span className="mono driver-loss">−{points(driver.lost_points)}</span>
+                          <span className="grow"><b>{driver.title}.</b> {driver.reason}</span>
+                          {driver.turn !== null && (
+                            <Button
+                              size="small"
+                              onClick={() => {
+                                setTab('checklist')
+                                setOpen(driver.criterion_id)
+                                jump(driver.turn as number)
+                              }}
+                            >
+                              Перейти к фрагменту
+                            </Button>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

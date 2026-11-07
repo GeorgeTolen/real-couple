@@ -74,6 +74,7 @@ async def run_job(
     models: dict[str, str] | None = None,
     use_cache: bool = True,
     on_result: Callable[[dict[str, Any]], None] | None = None,
+    changed_only: bool = False,
 ) -> dict[str, Any]:
     checklist = repo.get_checklist(checklist_id, version)
     limiter = asyncio.Semaphore(max(1, get_settings().llm_concurrency))
@@ -97,7 +98,7 @@ async def run_job(
             state["in_progress"] += 1
             save()
             result = await evaluator.evaluate_conversation(
-                conversation_id, checklist, mode, models, use_cache
+                conversation_id, checklist, mode, models, use_cache, changed_only
             )
             state["in_progress"] -= 1
             state["done"] += 1

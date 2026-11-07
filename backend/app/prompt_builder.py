@@ -8,6 +8,8 @@ from .schemas import Checklist, Criterion
 from .scoring import allowed_answers, criteria_for_channel
 from .signals import signals_to_text
 
+NO_CATEGORY = "нет"
+
 BASE_RULES = """Ты эксперт отдела контроля качества (QA) Freedom Broker. Оцениваешь работу оператора поддержки строго по чек-листу.
 
 Правила:
@@ -36,6 +38,12 @@ def _criterion_block(criterion: Criterion) -> str:
         lines.append(f"- {step.value}: {step.label}")
     if criterion.allow_na and criterion.na_condition:
         lines.append(f"N/A: {criterion.na_condition}")
+    if criterion.categories:
+        lines.append(
+            "Поле category: при ответе Y укажи тип нарушения из списка: "
+            + ", ".join(criterion.categories)
+            + f". При ответе N укажи {NO_CATEGORY}."
+        )
     if criterion.guidance:
         lines.append(f"Подсказка: {criterion.guidance}")
     lines.append("Допустимые значения answer: " + ", ".join(allowed_answers(criterion)))
@@ -58,16 +66,19 @@ def build_system_prompt(
 
 
 def _criterion_schema(criterion: Criterion) -> dict[str, Any]:
+    properties: dict[str, Any] = {
+        "evidence_ids": {"type": "array", "items": {"type": "integer"}},
+        "checked_range": {"type": "array", "items": {"type": "integer"}},
+        "reasoning": {"type": "string"},
+    }
+    if criterion.categories:
+        properties["category"] = {"type": "string", "enum": [*criterion.categories, NO_CATEGORY]}
+    properties["answer"] = {"type": "string", "enum": allowed_answers(criterion)}
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["evidence_ids", "checked_range", "reasoning", "answer"],
-        "properties": {
-            "evidence_ids": {"type": "array", "items": {"type": "integer"}},
-            "checked_range": {"type": "array", "items": {"type": "integer"}},
-            "reasoning": {"type": "string"},
-            "answer": {"type": "string", "enum": allowed_answers(criterion)},
-        },
+        "required": list(properties),
+        "properties": properties,
     }
 
 

@@ -110,6 +110,24 @@ def save_new_version(config: Checklist) -> Checklist:
     return saved
 
 
+def add_criterion(checklist_id: str, criterion: Criterion) -> Checklist:
+    current = get_checklist(checklist_id)
+    data = current.model_dump()
+    data["criteria"].append(criterion.model_dump())
+    return save_new_version(Checklist.model_validate(data))
+
+
+def patch_criterion(checklist_id: str, criterion_id: str, fields: dict[str, Any]) -> Checklist:
+    current = get_checklist(checklist_id)
+    if not current.criterion(criterion_id):
+        raise NotFound(f"Критерий {criterion_id} не найден")
+    data = current.model_dump()
+    data["criteria"] = [
+        {**c, **fields} if c["id"] == criterion_id else c for c in data["criteria"]
+    ]
+    return save_new_version(Checklist.model_validate(data))
+
+
 def replace_criterion(checklist_id: str, criterion_id: str, replacement: Criterion) -> Checklist:
     current = get_checklist(checklist_id)
     if not current.criterion(criterion_id):
@@ -158,13 +176,14 @@ def insert_evaluation(
             conn.execute(
                 "INSERT INTO criterion_results(evaluation_id,criterion_id,answer,earned_points,max_points,"
                 "weighted_points,weight,normalized_weight,reasoning,evidence_ids_json,checked_range_json,"
-                "na_reason,agreement,judge_answers_json,source) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ai')",
+                "na_reason,agreement,judge_answers_json,category,source) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ai')",
                 (
                     evaluation_id, cid, item["answer"], point.get("earned_points"), point.get("max_points"),
                     point.get("weighted_points"), point.get("weight", 0), point.get("normalized_weight"),
                     item["reasoning"], json.dumps(item["evidence_ids"]), json.dumps(item["checked_range"]),
                     item["reasoning"] if item["answer"] == "NA" else None, item["agreement"],
-                    json.dumps(item["judge_answers"], ensure_ascii=False),
+                    json.dumps(item["judge_answers"], ensure_ascii=False), item.get("category"),
                 ),
             )
     return evaluation_id
@@ -251,6 +270,7 @@ def _view(row, rows: list[dict[str, Any]], appeals: list[dict[str, Any]]) -> dic
                 "checked_range": json.loads(result["checked_range_json"] or "null"),
                 "na_reason": result["na_reason"], "agreement": result["agreement"],
                 "judge_answers": json.loads(result["judge_answers_json"] or "{}"), "source": result["source"],
+                "category": result["category"],
             }
         )
     original = {
@@ -280,7 +300,99 @@ def _view(row, rows: list[dict[str, Any]], appeals: list[dict[str, Any]]) -> dic
         "gross_violation": totals["gross_violation"], "gross_items": totals["gross_items"],
         "criteria": final_criteria,
     }
-    return {**base, "original": original, "final": final}
+    return {
+        **base, "original": original, "final": final,
+        "score_drivers": score_drivers(final_criteria),
+        "gross_reasons": gross_reasons(final_criteria, conversation["turns"]),
+    }
+
+
+def first_sentence(text: str | None) -> str:
+    text = (text or "").strip()
+    for index, char in enumerate(text):
+        if char in ".!?" and (index + 1 == len(text) or text[index + 1] == " "):
+            return text[: index + 1]
+    return text
+
+
+def score_drivers(criteria: list[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
+    """Критерии, сильнее всего снизившие итог: для блока «Почему снижена оценка»."""
+    lost = []
+    for item in criteria:
+        if item["max_points"] is None or item["earned_points"] is None:
+            continue
+        points = round(item["max_points"] - item["earned_points"], 2)
+        if points > 0:
+            target = item["evidence_ids"][0] if item["evidence_ids"] else (
+                item["checked_range"][0] if item["checked_range"] else None
+            )
+            lost.append(
+                {
+                    "criterion_id": item["criterion_id"], "title": item["title"], "lost_points": points,
+                    "reason": first_sentence(item["reasoning"]), "turn": target,
+                }
+            )
+    lost.sort(key=lambda row: -row["lost_points"])
+    return lost[:limit]
+
+
+def gross_reasons(criteria: list[dict[str, Any]], turns: list[dict]) -> list[dict[str, Any]]:
+    """Грубые нарушения с типом и цитатой реплики: для экрана и фильтра."""
+    reasons = []
+    by_number = {t["n"]: t for t in turns}
+    for item in criteria:
+        if item["type"] != "flag" or item["answer"] != "Y":
+            continue
+        operator_turns = [
+            n for n in item["evidence_ids"] if by_number.get(n, {}).get("speaker") == "operator"
+        ]
+        target = (operator_turns or item["evidence_ids"] or [None])[0]
+        reasons.append(
+            {
+                "criterion_id": item["criterion_id"], "title": item["title"],
+                "category": item.get("category"), "explanation": item["reasoning"],
+                "turn": target, "quote": by_number[target]["text"] if target in by_number else None,
+                "evidence_ids": item["evidence_ids"],
+            }
+        )
+    return reasons
+
+
+def semantic_key(criterion: Criterion) -> str:
+    """То, что видит модель. Вес и код сдачи на ответ модели не влияют."""
+    return criterion.model_dump_json(exclude={"weight", "export_id", "section", "channel_overrides"})
+
+
+def reusable_results(
+    conversation: dict[str, Any], checklist: Checklist, mode: str
+) -> tuple[dict[str, dict[str, Any]], dict[str, str]] | None:
+    """Ответы прошлой версии чек-листа по критериям, формулировка которых не менялась."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id, checklist_version FROM evaluations WHERE conversation_id=? AND checklist_id=? "
+            "AND checklist_version<>? AND status='ok' AND mode=? AND transcript_hash=? "
+            "ORDER BY checklist_version DESC, id DESC LIMIT 1",
+            (conversation["id"], checklist.id, checklist.version, mode, conversation["transcript_hash"]),
+        ).fetchone()
+    if not row:
+        return None
+    previous = get_checklist(checklist.id, row["checklist_version"])
+    if previous.general_rules != checklist.general_rules:
+        return None
+    channel = conversation["channel"]
+    old = {c.id: semantic_key(c) for c in criteria_for_channel(previous, channel)}
+    view = build_view(row["id"])
+    items = {c["criterion_id"]: c for c in view["original"]["criteria"]}
+    reused = {}
+    for criterion in criteria_for_channel(checklist, channel):
+        item = items.get(criterion.id)
+        if item and old.get(criterion.id) == semantic_key(criterion):
+            reused[criterion.id] = {
+                key: item[key]
+                for key in ("answer", "reasoning", "evidence_ids", "checked_range", "category",
+                            "agreement", "judge_answers")
+            }
+    return reused, view["models"]
 
 
 def latest_evaluation_id(

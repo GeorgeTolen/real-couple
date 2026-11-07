@@ -6,19 +6,20 @@ from typing import Any
 from . import repo
 from .config import RESULTS_DIR, get_settings
 from .schemas import Checklist
+from .scoring import compute_totals
 
 SCHEMA_VERSION = "1.0"
 ALLOWED_SETS = ("dev", "prod")
 # Таблица со стр. 3 приложения к гайду: тип значения для каждого кода критерия.
 REQUIRED_CRITERIA: dict[str, dict[str, Any]] = {
-    "contact": {"kind": "bool", "nullable": False},
-    "discovery": {"kind": "bool", "nullable": True},
-    "identification": {"kind": "bool", "nullable": True},
-    "consultation": {"kind": "scale", "values": {0, 5, 10, 15, 20}, "nullable": True},
-    "empathy": {"kind": "bool", "nullable": False},
-    "dialogue": {"kind": "scale", "values": {0, 4, 7, 10}, "nullable": False},
-    "closure": {"kind": "bool", "nullable": True},
-    "critical": {"kind": "bool", "nullable": False},
+    "contact": {"kind": "bool", "nullable": False, "weight": 10},
+    "discovery": {"kind": "bool", "nullable": True, "weight": 15},
+    "identification": {"kind": "bool", "nullable": True, "weight": 20},
+    "consultation": {"kind": "scale", "values": {0, 5, 10, 15, 20}, "nullable": True, "weight": 20},
+    "empathy": {"kind": "bool", "nullable": False, "weight": 15},
+    "dialogue": {"kind": "scale", "values": {0, 4, 7, 10}, "nullable": False, "weight": 15},
+    "closure": {"kind": "bool", "nullable": True, "weight": 5},
+    "critical": {"kind": "bool", "nullable": False, "weight": 0},
 }
 VALID_MODES = {"local", "external_api", "hybrid"}
 
@@ -32,15 +33,38 @@ def missing_export_ids(checklist: Checklist) -> list[str]:
     return [code for code in REQUIRED_CRITERIA if code not in present]
 
 
+def is_official(checklist: Checklist) -> bool:
+    """Все 8 кодов с весами, шкалами и правилами N/A из таблицы организаторов."""
+    if missing_export_ids(checklist):
+        return False
+    for criterion in checklist.criteria:
+        rule = REQUIRED_CRITERIA.get(criterion.export_id or "")
+        if rule is None:
+            if criterion.weight > 0:
+                return False
+            continue
+        if criterion.weight != rule["weight"] or criterion.allow_na != rule["nullable"]:
+            return False
+        if rule["kind"] == "scale":
+            if criterion.type != "scale" or {s.value for s in criterion.scale or []} != rule["values"]:
+                return False
+        elif criterion.type == "scale":
+            return False
+    return True
+
+
 def latest_exportable_version(checklist_id: str) -> int:
-    """Последняя версия чек-листа, где заданы все 8 кодов критериев организаторов."""
+    """Последняя версия по правилам организаторов. Правки для демо в сдачу сами не попадают."""
     versions = next(
         (c["versions"] for c in repo.list_checklists() if c["id"] == checklist_id), []
     )
     for item in versions:
-        if not missing_export_ids(repo.get_checklist(checklist_id, item["version"])):
+        if is_official(repo.get_checklist(checklist_id, item["version"])):
             return item["version"]
-    raise ExportError(f"Ни в одной версии чек-листа {checklist_id} нет всех 8 кодов критериев")
+    raise ExportError(
+        f"Ни одна версия чек-листа {checklist_id} не совпадает с таблицей организаторов. "
+        "Укажите версию явно."
+    )
 
 
 def _value(answer: str) -> Any:
@@ -232,12 +256,48 @@ def _check_ok_entry(where: str, entry: dict[str, Any]) -> list[str]:
     if not isinstance(score, dict):
         return problems + [f"{where}: нет score"]
     final = score.get("final_score")
-    if isinstance(final, bool) or not isinstance(final, (int, float)) or not 0 <= final <= 100:
+    if final is None:
+        # Допустимо, только если все критерии с весом получили N/A.
+        if any(values.get(c) is not None for c, r in REQUIRED_CRITERIA.items() if r["weight"]):
+            problems.append(f"{where}: final_score пуст, хотя есть применимые критерии")
+    elif isinstance(final, bool) or not isinstance(final, (int, float)) or not 0 <= final <= 100:
         problems.append(f"{where}: final_score должен быть числом от 0 до 100")
     elif round(final, 2) != final:
         problems.append(f"{where}: final_score должен быть округлён до двух знаков")
     if "critical" in values and score.get("critical_flag") != values["critical"]:
         problems.append(f"{where}: critical_flag должен совпадать со значением critical")
+    return problems
+
+
+def check_against_data(doc: dict[str, Any], checklist: Checklist) -> list[str]:
+    """Сверка с данными: ID существует, номера реплик в границах, итог совпадает с пересчётом."""
+    problems: list[str] = []
+    ids_by_code = {c.export_id: c.id for c in checklist.criteria if c.export_id}
+    for entry in doc.get("results", []):
+        cid = entry.get("conversation_id")
+        try:
+            conversation = repo.get_conversation(cid)
+        except repo.NotFound:
+            problems.append(f"{cid}: такого диалога нет в импортированных данных")
+            continue
+        if entry.get("status") != "ok":
+            continue
+        n_turns = len(conversation["turns"])
+        answers: dict[str, str] = {}
+        for item in entry["criteria"]:
+            code = item["criterion_id"]
+            value = item["value"]
+            answers[ids_by_code[code]] = (
+                "NA" if value is None else ("Y" if value is True else "N" if value is False else str(value))
+            )
+            outside = [t for t in item["evidence_turns"] if t > n_turns]
+            if outside:
+                problems.append(f"{cid}/{code}: реплик {n_turns}, а указаны номера {outside}")
+        recomputed = compute_totals(checklist, answers, conversation["channel"])["total"]
+        if recomputed != entry["score"]["final_score"]:
+            problems.append(
+                f"{cid}: final_score {entry['score']['final_score']}, а пересчёт даёт {recomputed}"
+            )
     return problems
 
 
