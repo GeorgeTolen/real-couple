@@ -6,7 +6,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 node_modules/
-data/cqa.sqlite*
+data/*.sqlite*
 data/audio/
 tools/
 *.log

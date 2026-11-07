@@ -9,8 +9,12 @@
 ```bash
 cp .env.example .env        # впишите OPENROUTER_API_KEY и ORGANIZER_API_URL
 make install
+make import                 # 65 диалогов DEV из API организаторов
+make evaluate-all           # оценка всех диалогов, около $1,6 и 10 минут
 make run                    # http://localhost:8000, документация API на /docs
 ```
+
+База не входит в репозиторий, поэтому до импорта список диалогов пуст. Импортировать набор и запустить оценку можно и из интерфейса, на экране «Оценка». Готовые результаты лежат в `results/dev/results.json`.
 
 `ORGANIZER_API_URL` это адрес кнопки «Открыть GET для DEV» со стр. 3 файла `docs/CQA_Hackathon_Student_Guide_v3.pdf`, без параметра `group_id`.
 

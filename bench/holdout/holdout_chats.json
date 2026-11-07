@@ -1,0 +1,131 @@
+[
+  {
+    "conversation_id": "h1-ru-001", "channel": "agent chat", "language": "RU", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "Когда придут дивиденды по Apple и сколько с них удержат налога?"},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Здравствуйте! Я AIM, AI-ассистент Freedom Broker. Могу ответить на вопросы о продуктах и услугах и передать вопрос специалистам поддержки."},
+      {"timestamp": "00:20", "speaker": "client", "text": "Соедините с оператором."},
+      {"timestamp": "00:22", "speaker": "bot", "text": "Пожалуйста, ожидайте. Оператор скоро подключится к чату."},
+      {"timestamp": "00:23", "speaker": "system", "text": "Эскалация на оператора."},
+      {"timestamp": "01:05", "speaker": "operator", "text": "Здравствуйте! Меня зовут Дамир. Дивиденды поступают на брокерский счёт в течение нескольких рабочих дней после даты выплаты. С американских бумаг удерживается налог у источника, ставка зависит от того, подписана ли форма W-8BEN."},
+      {"timestamp": "01:40", "speaker": "client", "text": "Форма подписана. Где увидеть, сколько реально удержали?"},
+      {"timestamp": "02:05", "speaker": "operator", "text": "Это видно в отчёте брокера, раздел «Корпоративные действия». Там отдельной строкой указаны начисление и налог."},
+      {"timestamp": "02:30", "speaker": "client", "text": "Нашёл, спасибо."},
+      {"timestamp": "02:50", "speaker": "operator", "text": "Итого: выплата придёт автоматически, а сумму налога вы увидите в отчёте. Могу ещё чем-то помочь? Хорошего дня!"}
+    ]
+  },
+  {
+    "conversation_id": "h1-ru-002", "channel": "agent chat", "language": "RU", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "Подала заявку на вывод три дня назад, денег всё нет, я уже переживаю."},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Здравствуйте! Я AIM, AI-ассистент Freedom Broker. Для проверки индивидуальной ситуации потребуется оператор."},
+      {"timestamp": "00:15", "speaker": "client", "text": "Да, нужен оператор."},
+      {"timestamp": "00:16", "speaker": "system", "text": "Эскалация на оператора."},
+      {"timestamp": "01:10", "speaker": "operator", "text": "Добрый день! Меня зовут Жанна. Понимаю, что задержка вас беспокоит, сейчас разберёмся. Чтобы посмотреть заявку, подтвердите, пожалуйста, личность кодом из приложения."},
+      {"timestamp": "01:45", "speaker": "client", "text": "Подтвердила."},
+      {"timestamp": "01:46", "speaker": "system", "text": "Личность клиента подтверждена."},
+      {"timestamp": "02:20", "speaker": "operator", "text": "Спасибо. Вижу заявку на 200 000 тенге, она на проверке в службе комплаенс. Решение будет до завтра, 18:00, вам придёт уведомление."},
+      {"timestamp": "02:50", "speaker": "client", "text": "Хорошо, спасибо, теперь понятно."},
+      {"timestamp": "03:10", "speaker": "operator", "text": "Итак, заявка в работе, ответ придёт до завтрашнего вечера. Если уведомления не будет, напишите нам, проверим ещё раз. Всего доброго!"}
+    ]
+  },
+  {
+    "conversation_id": "h1-ru-003", "channel": "agent chat", "language": "RU", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "Сколько сейчас денег у меня на счёте и почему часть заблокирована?"},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Здравствуйте! Я AIM, AI-ассистент Freedom Broker. Для проверки индивидуальной ситуации потребуется оператор."},
+      {"timestamp": "00:14", "speaker": "client", "text": "Давайте оператора."},
+      {"timestamp": "00:15", "speaker": "system", "text": "Эскалация на оператора."},
+      {"timestamp": "00:58", "speaker": "operator", "text": "Здравствуйте, я Артём. На вашем счёте 1 240 долларов, из них 300 заблокированы под комиссию за обслуживание, она спишется в конце месяца."},
+      {"timestamp": "01:30", "speaker": "client", "text": "Понятно, спасибо."},
+      {"timestamp": "01:50", "speaker": "operator", "text": "Обращайтесь. Всего доброго!"}
+    ]
+  },
+  {
+    "conversation_id": "h1-ru-004", "channel": "agent chat", "language": "RU", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "С меня сняли комиссию 15 долларов, хотя в этом месяце я не сделал ни одной сделки. Это как понимать?"},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Здравствуйте! Я AIM, AI-ассистент Freedom Broker. Передаю ваш вопрос специалисту поддержки."},
+      {"timestamp": "00:03", "speaker": "system", "text": "Эскалация на оператора."},
+      {"timestamp": "01:00", "speaker": "operator", "text": "Вы тариф читали вообще?"},
+      {"timestamp": "01:25", "speaker": "client", "text": "Читал. Там про комиссию за сделки, а сделок не было."},
+      {"timestamp": "01:55", "speaker": "operator", "text": "Если не понимаете простых вещей, зачем вы полезли в инвестиции? Это ежемесячная плата за обслуживание счёта."},
+      {"timestamp": "02:15", "speaker": "client", "text": "Это хамство. Я буду жаловаться."},
+      {"timestamp": "02:30", "speaker": "system", "text": "Оператор закрыл чат."}
+    ]
+  },
+  {
+    "conversation_id": "h1-kz-001", "channel": "agent chat", "language": "KZ", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "Шотты Kaspi арқылы қалай толықтыруға болады?"},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Сәлеметсіз бе! Мен AIM, Freedom Broker компаниясының жасанды интеллект көмекшісімін. Сұрағыңызды маманға жібере аламын."},
+      {"timestamp": "00:15", "speaker": "client", "text": "Операторға қосыңыз."},
+      {"timestamp": "00:16", "speaker": "system", "text": "Чат операторға жіберілді."},
+      {"timestamp": "01:02", "speaker": "operator", "text": "Сәлеметсіз бе! Менің атым Ержан. Қосымшада «Мәзір» бөлімінен «Толықтыру» батырмасын басып, реквизиттерді көшіріңіз. Содан кейін оларды Kaspi қосымшасындағы аударымға енгізесіз."},
+      {"timestamp": "01:40", "speaker": "client", "text": "Түсінікті, рақмет."},
+      {"timestamp": "02:00", "speaker": "operator", "text": "Ақша әдетте бір жұмыс күні ішінде түседі. Тағы сұрағыңыз бар ма? Сау болыңыз!"}
+    ]
+  },
+  {
+    "conversation_id": "h1-kz-002", "channel": "agent chat", "language": "KZ", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "Қазір қай акцияларды сатып алған дұрыс? Кеңес беріңізші."},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Сәлеметсіз бе! Мен AIM көмекшісімін. Сұрағыңызды маманға жіберемін."},
+      {"timestamp": "00:03", "speaker": "system", "text": "Чат операторға жіберілді."},
+      {"timestamp": "00:50", "speaker": "operator", "text": "Сәлеметсіз бе, мен Гүлназбын. Чатта инвестициялық кеңес бермейміз. Бірақ маған WhatsApp арқылы жазсаңыз, ақылы түрде сізге жеке портфель жинап беремін."},
+      {"timestamp": "01:20", "speaker": "client", "text": "Жоқ, керек емес."},
+      {"timestamp": "01:40", "speaker": "operator", "text": "Жарайды."}
+    ]
+  },
+  {
+    "conversation_id": "h1-kz-003", "channel": "agent chat", "language": "KZ", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "Кабинетке кіре алмаймын, құпиясөз қате деп тұр."},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Сәлеметсіз бе! Мен AIM көмекшісімін. Сізді операторға қосайын ба?"},
+      {"timestamp": "00:12", "speaker": "client", "text": "Иә."},
+      {"timestamp": "00:13", "speaker": "system", "text": "Чат операторға жіберілді."},
+      {"timestamp": "01:15", "speaker": "operator", "text": "Мәселеңіз қандай?"},
+      {"timestamp": "01:40", "speaker": "client", "text": "Жоғарыда жаздым ғой, құпиясөз қате деп тұр."},
+      {"timestamp": "02:10", "speaker": "operator", "text": "Кіру бетінде «Құпиясөзді ұмыттым» батырмасын басыңыз, код SMS арқылы келеді."},
+      {"timestamp": "02:45", "speaker": "client", "text": "Кірдім, рақмет."},
+      {"timestamp": "03:00", "speaker": "operator", "text": "Сау болыңыз."}
+    ]
+  },
+  {
+    "conversation_id": "h1-en-001", "channel": "agent chat", "language": "EN", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "I sold some shares today. When can I withdraw the money?"},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Hello! I'm AIM, the AI assistant of Freedom Broker. I can pass your question to a support specialist."},
+      {"timestamp": "00:12", "speaker": "client", "text": "Yes please, an agent."},
+      {"timestamp": "00:13", "speaker": "system", "text": "Chat transferred to an agent."},
+      {"timestamp": "00:55", "speaker": "operator", "text": "Hello, this is Sam. Happy to help. Which market did you sell on, US or KASE? Settlement differs."},
+      {"timestamp": "01:20", "speaker": "client", "text": "US."},
+      {"timestamp": "01:45", "speaker": "operator", "text": "For US shares settlement is T+1, so the cash becomes available for withdrawal on the next business day. Then submit a request under Menu, Withdraw funds."},
+      {"timestamp": "02:15", "speaker": "client", "text": "Great, clear."},
+      {"timestamp": "02:35", "speaker": "operator", "text": "So tomorrow you can submit the withdrawal request in the app. Is there anything else I can help with? Have a good day!"}
+    ]
+  },
+  {
+    "conversation_id": "h1-en-002", "channel": "agent chat", "language": "EN", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "hi i need a human"},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Hello! I'm AIM, the AI assistant of Freedom Broker. Please wait, an agent will join the chat shortly."},
+      {"timestamp": "00:03", "speaker": "system", "text": "Chat transferred to an agent."},
+      {"timestamp": "00:48", "speaker": "operator", "text": "Hello, I'm Lily. How can I help you today?"},
+      {"timestamp": "01:10", "speaker": "system", "text": "The client left the chat."}
+    ]
+  },
+  {
+    "conversation_id": "h1-en-003", "channel": "agent chat", "language": "EN", "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "client", "text": "I got a margin warning. What is my margin level right now? This is urgent."},
+      {"timestamp": "00:02", "speaker": "bot", "text": "Hello! I'm AIM, the AI assistant of Freedom Broker. Checking an individual situation requires an agent."},
+      {"timestamp": "00:03", "speaker": "system", "text": "Chat transferred to an agent."},
+      {"timestamp": "00:40", "speaker": "operator", "text": "Hi, my name is Omar. I understand this is urgent. To share account details I need to verify you first, please confirm the code in the app."},
+      {"timestamp": "01:05", "speaker": "client", "text": "I don't have time for that, just tell me the number."},
+      {"timestamp": "01:30", "speaker": "operator", "text": "I can't share it without verification, but you can see it yourself in the app under Portfolio, Margin. If it falls below the requirement, positions may be closed, so consider adding funds."},
+      {"timestamp": "02:00", "speaker": "client", "text": "Fine, I see it. Thanks."},
+      {"timestamp": "02:20", "speaker": "operator", "text": "You're welcome. If you need me to check anything later, write to us and we'll verify you then. Have a good day!"}
+    ]
+  }
+]

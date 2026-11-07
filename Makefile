@@ -10,7 +10,7 @@ ROOT_PY := $(PY)
 
 GROUP ?= DEV
 
-.PHONY: install-whisper whisper install run test build-front import bench evaluate-all export-dev validate-dev prod rehearsal
+.PHONY: holdout install-whisper whisper install run test build-front import bench evaluate-all export-dev validate-dev prod rehearsal
 
 install:
 	python -m venv .venv
@@ -45,6 +45,10 @@ install-whisper:
 
 whisper:
 	cd backend && $(PY) -m app.cli whisper
+
+# Контрольный набор вне калибровки: отдельная база, отчёт в bench/holdout.
+holdout:
+	cd backend && $(PY) -m app.cli holdout
 
 # Час контроля: импорт, оценка, экспорт, проверка, коммит и пуш results/prod/results.json.
 prod:

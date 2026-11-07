@@ -3,12 +3,13 @@ import hashlib
 import json
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .config import CHECKLISTS_DIR, get_settings
 
 _db_override: Path | None = None
+CLI_JOB_MAX_AGE = timedelta(hours=2)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
@@ -161,13 +162,23 @@ def init_db() -> None:
         columns = {r["name"] for r in conn.execute("PRAGMA table_info(criterion_results)")}
         if "category" not in columns:
             conn.execute("ALTER TABLE criterion_results ADD COLUMN category TEXT")
-        # Задачи прошлого запуска уже не выполняются: процесс завершён.
-        conn.execute(
-            "UPDATE jobs SET status='interrupted', in_progress=0, finished_at=? "
-            "WHERE status IN ('queued','running')",
-            (now_iso(),),
-        )
     seed_checklists()
+
+
+def mark_interrupted_jobs() -> int:
+    """Вызывается при старте сервера. Задачи сервера умерли вместе с ним.
+
+    Задачи CLI работают в своём процессе, поэтому их трогаем, только если они явно зависли.
+    """
+    stale_before = (datetime.now(timezone.utc) - CLI_JOB_MAX_AGE).isoformat(timespec="seconds")
+    with connect() as conn:
+        cursor = conn.execute(
+            "UPDATE jobs SET status='interrupted', in_progress=0, finished_at=? "
+            "WHERE status IN ('queued','running') "
+            "AND (json_extract(params_json,'$.source')='api' OR created_at<?)",
+            (now_iso(), stale_before),
+        )
+        return cursor.rowcount
 
 
 def seed_checklists() -> None:

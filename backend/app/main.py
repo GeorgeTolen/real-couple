@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import repo
 from .config import FRONTEND_DIST
-from .db import init_db
+from .db import init_db, mark_interrupted_jobs
 from .llm import LLMError
 from .routers import appeals, checklists, conversations, evaluations, export, jobs, models, stats
 
@@ -20,6 +20,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    mark_interrupted_jobs()
     yield
 
 

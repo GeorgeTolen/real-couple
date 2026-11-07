@@ -1,4 +1,5 @@
 import copy
+import json
 
 import pytest
 
@@ -350,3 +351,49 @@ async def test_driver_reason_keeps_failure_and_points_to_it(database, dev_record
     drivers = repo.score_drivers(criteria)
     assert len(drivers) == 1 and "сбой" in drivers[0]["reason"]
     assert drivers[0]["turn"] == 16
+
+
+def _insert_job(source):
+    from app.db import connect, now_iso
+
+    with connect() as conn:
+        return conn.execute(
+            "INSERT INTO jobs(status,total,params_json,created_at) VALUES('running',1,?,?)",
+            (json.dumps({"source": source}), now_iso()),
+        ).lastrowid
+
+
+def test_cli_start_does_not_touch_running_jobs(database):
+    from app import db, jobs
+
+    cli_job, api_job = _insert_job("cli"), _insert_job("api")
+    db.init_db()
+    assert jobs.get_job(cli_job)["status"] == "running"
+    assert jobs.get_job(api_job)["status"] == "running"
+    # Старт сервера завершает только собственные задачи.
+    assert db.mark_interrupted_jobs() == 1
+    assert jobs.get_job(cli_job)["status"] == "running"
+    assert jobs.get_job(api_job)["status"] == "interrupted"
+
+
+def test_holdout_files_match_checklist(default_config):
+    from app.config import BENCH_DIR
+    from app.schemas import Checklist
+    from app.scoring import allowed_answers
+
+    checklist = Checklist.model_validate(default_config)
+    records = ingest.parse_records(
+        json.loads((BENCH_DIR / "holdout/holdout_chats.json").read_text(encoding="utf-8"))
+    )
+    gt = json.loads((BENCH_DIR / "holdout/gt_holdout.json").read_text(encoding="utf-8"))
+    gt.pop("_legend")
+    assert len(records) == 10 and {r["conversation_id"] for r in records} == set(gt)
+    dev = json.loads((BENCH_DIR.parent / "data/dev.json").read_text(encoding="utf-8"))["data"]["records"]
+    dev_lines = {t["text"] for r in dev for t in r["transcript"] if t["speaker"] == "operator"}
+    for record in records:
+        assert all(
+            t["text"] not in dev_lines for t in record["transcript"] if t["speaker"] == "operator"
+        ), record["conversation_id"]
+    for labels in gt.values():
+        for criterion in checklist.criteria:
+            assert str(labels[criterion.id]).rstrip("?") in allowed_answers(criterion), labels

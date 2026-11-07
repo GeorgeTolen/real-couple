@@ -11,11 +11,13 @@ from typing import Any
 
 from . import asr, audio, export, ingest, jobs, repo
 from .config import BENCH_DIR, DATA_DIR, ROOT
-from .db import init_db
+from .db import init_db, use_database
 from .scoring import compute_totals
 
 BENCH_MIN_ACCURACY = 95.0
 BENCH_MAX_MAE = 5.0
+HOLDOUT_DIR = BENCH_DIR / "holdout"
+HOLDOUT_GROUP = "HOLDOUT"
 BENCH_MIN_STABILITY = 98.0
 DEFAULT_CHECKLIST = "freedom-default"
 PROD_EXPECTED = 10
@@ -174,6 +176,43 @@ def cmd_whisper(args) -> int:
             failed += 1
             _log(f"{conversation_id}: ОШИБКА {exc}")
     return 1 if failed else 0
+
+
+def cmd_holdout(args) -> int:
+    """Контрольный набор вне калибровки. Работает в отдельной базе data/holdout.sqlite."""
+    records = json.loads((HOLDOUT_DIR / "holdout_chats.json").read_text(encoding="utf-8"))
+    gt = json.loads((HOLDOUT_DIR / "gt_holdout.json").read_text(encoding="utf-8"))
+    gt = {k: v for k, v in gt.items() if not k.startswith("_")}
+    count = ingest.store_records(ingest.parse_records(records), HOLDOUT_GROUP)
+    _log(f"Загружено диалогов: {count}")
+    checklist = repo.get_checklist(args.checklist, args.version)
+    job = asyncio.run(_evaluate(list(gt), checklist.id, checklist.version, args.mode, False))
+    report = _bench_report(gt, checklist.id, checklist.version)
+    report.update(spent_usd=job["cost_usd"], mode=args.mode, checklist_version=checklist.version)
+    doc = export.build_results(HOLDOUT_GROUP, checklist.id, checklist.version)
+    problems = export.validate_results(doc, len(gt)) + export.check_against_data(doc, checklist)
+    report["format_problems"] = problems
+    answers = []
+    for conversation_id in gt:
+        view = repo.build_view(repo.latest_evaluation_id(conversation_id, checklist.id, checklist.version, only_ok=True))
+        answers.append(
+            {
+                "conversation_id": conversation_id, "total": view["original"]["total"],
+                "gross": view["gross_reasons"], "needs_review": view["needs_review"],
+                "criteria": {
+                    c["criterion_id"]: {
+                        "answer": c["answer"], "expected": gt[conversation_id][c["criterion_id"]],
+                        "agreement": c["agreement"], "reasoning": c["reasoning"],
+                    }
+                    for c in view["original"]["criteria"]
+                },
+            }
+        )
+    text = json.dumps({"report": report, "answers": answers}, ensure_ascii=False, indent=2)
+    (HOLDOUT_DIR / "holdout_report.json").write_text(text, encoding="utf-8")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    _log(f"Точность {report['accuracy']:.1f}%, MAE {report['mae']}, нарушений формата {len(problems)}")
+    return 0
 
 
 def cmd_bench(args) -> int:
@@ -369,6 +408,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--repeat", type=int, default=1)
     p.set_defaults(func=cmd_bench)
 
+    p = sub.add_parser("holdout")
+    p.add_argument("--checklist", default=DEFAULT_CHECKLIST)
+    p.add_argument("--version", type=int)
+    p.add_argument("--mode", default="ensemble", choices=["single", "ensemble", "local"])
+    p.set_defaults(func=cmd_holdout)
+
     p = sub.add_parser("whisper")
     p.add_argument("--ids")
     p.set_defaults(func=cmd_whisper)
@@ -399,6 +444,8 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_prod)
 
     args = parser.parse_args(argv)
+    if args.command == "holdout":
+        use_database(DATA_DIR / "holdout.sqlite")
     init_db()
     return args.func(args)
 
