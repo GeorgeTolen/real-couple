@@ -1,0 +1,17 @@
+model                            acc%  RU   KZ   EN  | c8  | MAE_total | $/dialog  avg_s
+openai/gpt-6.1-sol               97.5   98   94  100 | 12/12 |   5.71    | 0.0083    9.2  n=12
+google/gemini-3.8-flash          97.3   97  100   95 | 10/11 |   2.97    | 0.0089   15.9  n=11
+openai/gpt-6.1-terra             96.2   95  100   95 | 12/12 |   9.58    | 0.0042    9.3  n=12
+google/gemini-4-argon            96.2   98   94   95 | 12/12 |   4.86    | 0.0120   13.4  n=12
+anthropic/claude-opus-5.5        95.2   95  100   93 | 9/9 |   2.85    | 0.0336   13.9  n=9
+openai/gpt-6-luna                91.1   90   94   90 | 12/12 |  10.16    | 0.0007   14.3  n=12
+z-ai/glm-5.3-flash               89.9   85   94   95 | 12/12 |   8.83    | 0.0005    6.0  n=12
+anthropic/claude-sonnet-5.5      88.6   85   89   95 | 11/12 |  11.22    | 0.0151    9.0  n=12
+deepseek/deepseek-v4.1-flash     88.6   88   83   95 | 12/12 |  10.29    | 0.0020   13.7  n=12
+qwen/qwen3.8-27b                 87.3   82   83  100 | 12/12 |  16.27    | 0.0066   25.0  n=12
+anthropic/claude-haiku-5.5       81.0   82   83   76 | 12/12 |  14.80    | 0.0013   10.2  n=12
+
+per-criterion accuracy (all models pooled):
+{'c1': '92% (n=128)', 'c2': '93% (n=98)', 'c3': '100% (n=117)', 'c4': '77% (n=87)', 'c5': '89% (n=118)', 'c6': '84% (n=107)', 'c7': '97% (n=63)', 'c8': '98% (n=128)'}
+
+total spend this file: $1.009
