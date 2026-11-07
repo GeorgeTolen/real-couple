@@ -13,6 +13,7 @@ from .config import AUDIO_DIR, get_settings
 
 _SOURCE_RE = re.compile(r"<source[^>]*\bsrc=[\"']([^\"']+)[\"']", re.IGNORECASE)
 _SILENCE_RE = re.compile(r"silence_start: ([\d.]+)|silence_end: ([\d.]+) \| silence_duration: ([\d.]+)")
+STARTED = ("запущен", "recording started")
 PAUSED = ("приостановлен", "paused")
 RESUMED = ("возобновлен", "resumed")
 TEMPO_NORM = (110, 170)
@@ -84,20 +85,51 @@ def recording_gaps(turns: list[dict]) -> list[tuple[float, float]]:
     return gaps
 
 
+def recording_start(turns: list[dict]) -> float:
+    """Секунда разговора, с которой идёт запись: начало mp3 соответствует этому событию."""
+    for turn in turns:
+        if turn["speaker"] == "system" and turn["t_sec"] is not None:
+            if any(s in turn["text"].lower() for s in STARTED):
+                return turn["t_sec"]
+    return 0.0
+
+
 def add_audio_time(turns: list[dict]) -> list[dict]:
-    """Добавляет t_audio: положение реплики в записи с учётом пауз записи."""
+    """Добавляет t_audio: положение реплики в записи с учётом начала и пауз записи."""
+    start_at = recording_start(turns)
     gaps = recording_gaps(turns)
     result = []
     for turn in turns:
         t_sec = turn["t_sec"]
         t_audio = None
         if t_sec is not None:
-            skipped = sum(
-                min(t_sec, end) - start for start, end in gaps if t_sec > start
-            )
-            t_audio = round(max(0.0, t_sec - skipped), 3)
+            skipped = sum(min(t_sec, end) - start for start, end in gaps if t_sec > start)
+            t_audio = round(max(0.0, t_sec - start_at - skipped), 3)
         result.append({**turn, "t_audio": t_audio})
     return result
+
+
+def tempo_without_silence(turns: list[dict], silences: list[dict[str, float]]) -> int | None:
+    """Темп оператора по записи: из времени до следующей реплики вычитается найденная тишина."""
+    spoken = [
+        t for t in add_audio_time(turns)
+        if t["speaker"] in ("operator", "client") and t["t_audio"] is not None
+    ]
+    words, seconds = 0, 0.0
+    for current, following in zip(spoken, spoken[1:]):
+        if current["speaker"] != "operator":
+            continue
+        begin, end = current["t_audio"], following["t_audio"]
+        if not 0 < end - begin <= 60:
+            continue
+        quiet = sum(
+            max(0.0, min(end, s["start"] + s["duration"]) - max(begin, s["start"]))
+            for s in silences
+        )
+        if end - begin - quiet > 0:
+            words += len(current["text"].split())
+            seconds += end - begin - quiet
+    return round(words / seconds * 60) if seconds > 0 else None
 
 
 def transcript_metrics(turns: list[dict]) -> dict[str, Any]:
@@ -213,6 +245,9 @@ async def speech_metrics(conversation_id: str, audio_url: str | None, turns: lis
             duration_sec=measured["duration_sec"],
             audio_pauses_over_3s=sum(1 for s in inner if s["duration"] > LONG_PAUSE_SEC),
         )
+        tempo = tempo_without_silence(turns, measured["silences"])
+        if tempo:
+            metrics.update(tempo_wpm=tempo, tempo_in_norm=TEMPO_NORM[0] <= tempo <= TEMPO_NORM[1])
     except (AudioError, OSError, subprocess.SubprocessError, httpx.HTTPError, ValueError) as exc:
         metrics["audio_error"] = str(exc)
     metrics["summary"] = _describe(metrics)

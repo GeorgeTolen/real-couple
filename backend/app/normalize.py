@@ -8,10 +8,11 @@ from typing import Any
 HIDDEN_NAME = "[Имя скрыто]"
 _NAME = r"([A-ZА-ЯЁӘҒҚҢӨҰҮҺІ][a-zа-яёәғқңөұүһі]+)"
 _NAME_PATTERNS = [
-    re.compile(r"меня зовут\s+" + _NAME),
-    re.compile(r"(?:^|[\s,.!])я\s*[,:-]?\s*" + _NAME),
+    re.compile(r"[Мм]еня зовут\s+" + _NAME),
+    re.compile(r"(?:^|[\s,.!])[Яя]\s*[,:-]?\s*" + _NAME),
+    re.compile(r"\b[Мм]енің атым\s+" + _NAME),
+    re.compile(r"\b[Аа]тым\s+" + _NAME),
     re.compile(r"\b[Мм]ен\s+" + _NAME),
-    re.compile(r"\bАтым\s+" + _NAME),
     re.compile(r"[Mm]y name is\s+" + _NAME),
     re.compile(r"\bI['’]m\s+" + _NAME),
     re.compile(r"\bI am\s+" + _NAME),

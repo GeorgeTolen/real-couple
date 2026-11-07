@@ -1,4 +1,4 @@
-from app.audio import add_audio_time, extract_source_url, transcript_metrics
+from app.audio import add_audio_time, extract_source_url, tempo_without_silence, transcript_metrics
 from app.normalize import extract_operator_name, normalize_transcript, render_for_prompt
 from app.signals import compute_signals
 
@@ -49,6 +49,10 @@ def test_operator_name_in_three_languages():
     assert extract_operator_name(_operator_says("Сәлеметсіз бе, мен Айданамын.")) == "Айдана"
     assert extract_operator_name(_operator_says("Hi, I'm Anna. How can I help?")) == "Anna"
     assert extract_operator_name(_operator_says("Open settings then log in.")) is None
+    assert extract_operator_name(_operator_says("Здравствуйте! Меня зовут Алина. Откройте меню.")) == "Алина"
+    assert extract_operator_name(_operator_says("Добрый день! Я Лера из поддержки.")) == "Лера"
+    assert extract_operator_name(_operator_says("Сәлеметсіз бе, менің атым Аружан.")) == "Аружан"
+    assert extract_operator_name(_operator_says("Я посмотрел ваш счёт.")) is None
 
 
 def test_hidden_name_counts_as_introduction():
@@ -95,6 +99,27 @@ def test_audio_time_skips_recording_pause():
         ]
     )
     assert add_audio_time(turns)[2]["t_audio"] == 20
+
+
+def test_audio_time_counts_from_recording_start():
+    turns = normalize_transcript(
+        [
+            {"timestamp": "00:00", "speaker": "system", "text": "Агент присоединился."},
+            {"timestamp": "00:30", "speaker": "system", "text": "Запись и транскрибирование запущены."},
+            {"timestamp": "01:00", "speaker": "operator", "text": "Да"},
+        ]
+    )
+    assert add_audio_time(turns)[2]["t_audio"] == 30
+
+
+def test_tempo_excludes_silence_from_recording():
+    turns = normalize_transcript(
+        [
+            {"timestamp": "00:00", "speaker": "operator", "text": "один два три четыре"},
+            {"timestamp": "00:04", "speaker": "client", "text": "да"},
+        ]
+    )
+    assert tempo_without_silence(turns, [{"start": 2.0, "duration": 2.0}]) == 120
 
 
 def test_source_url_is_unescaped():
