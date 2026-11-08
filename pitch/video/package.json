@@ -1,0 +1,29 @@
+{
+  "name": "cqa-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts CQA30 out/cqa-30s.mp4 --codec=h264 --crf=20 --gl=swangle --concurrency=2 --pixel-format=yuv420p",
+    "poster": "remotion still src/index.ts CQA30 out/poster.png --frame=885 --gl=swangle",
+    "sound": "python scripts/sound.py out/sound.wav && ffmpeg -y -v error -i out/sound.wav -af loudnorm=I=-16:TP=-1.5:LRA=11 -ar 48000 out/sound-norm.wav && ffmpeg -y -v error -i out/cqa-30s.mp4 -i out/sound-norm.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest out/cqa-30s-sound.mp4"
+  },
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/onest": "^5.3.1",
+    "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@fontsource-variable/unbounded": "^5.3.0",
+    "@react-three/fiber": "^9.8.2",
+    "@remotion/cli": "^4.0.541",
+    "@remotion/three": "^4.0.541",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.541",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2"
+  }
+}

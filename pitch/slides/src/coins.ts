@@ -10,14 +10,14 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 export type CoinState = { progress: number; settled: boolean }
 export type CoinControls = { update: (state: CoinState) => void; dispose: () => void; snapshot: () => string; tilt: (deg: number) => void }
 
-const COINS = 12
-const RING_RADIUS = 2.9
+export const COINS = 12
+export const RING_RADIUS = 2.9
 const BASE_SPEED = (Math.PI * 2) / 20
 const MAX_PARALLAX = (6 * Math.PI) / 180
-const THICKNESS = 0.16
-const COIN_COLORS = ['#0e3b27', '#106b3d', '#138a4e']
+export const THICKNESS = 0.16
+export const COIN_COLORS = ['#0e3b27', '#106b3d', '#138a4e']
 
-function reededDisk(radius: number, teeth: number): Shape {
+export function reededDisk(radius: number, teeth: number): Shape {
   // Рифлёный гурт настоящей геометрией: контур диска с мелкими насечками.
   const points: Vector2[] = []
   const steps = teeth * 2
@@ -33,7 +33,7 @@ function rect(x0: number, x1: number, y0: number, y1: number): Shape {
   return new Shape([new Vector2(x0, y0), new Vector2(x1, y0), new Vector2(x1, y1), new Vector2(x0, y1)])
 }
 
-function tengeShapes(): Shape[] {
+export function tengeShapes(): Shape[] {
   // Знак ₸: верхняя планка и вторая планка с вертикальной ножкой.
   const top = rect(-0.42, 0.42, 0.34, 0.47)
   const stem = new Shape([
