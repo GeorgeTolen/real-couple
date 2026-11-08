@@ -16,8 +16,16 @@ from scipy.signal import butter, fftconvolve, sosfilt
 ROOT = Path(__file__).resolve().parents[3]
 SR = 48000
 FPS = 30
-DUR = 30.0
+# Паузы из src/holds.json: события пишутся в кадрах сюжета, Bus.add переносит их на выходное время
+HOLDS = json.loads((Path(__file__).resolve().parents[1] / 'src/holds.json').read_text(encoding='utf-8'))['holds']
+DUR = (900 + sum(n for _, n in HOLDS)) / FPS
 N = int(SR * DUR)
+
+
+def story_to_out(t: float) -> float:
+    """Секунды сюжета → секунды выходного ролика (паузы до этого момента добавляются)."""
+    f = t * FPS
+    return (f + sum(n for at, n in HOLDS if at < f)) / FPS
 rng = np.random.default_rng(7)
 
 # Стыки сцен (src/Video.tsx): шторка между мирами и растворение внутри мира
@@ -38,7 +46,7 @@ class Bus:
         self.x = np.zeros((2, N))
 
     def add(self, sig: np.ndarray, t: float, gain: float = 1.0, pan: float = 0.0) -> None:
-        i = int(t * SR)
+        i = int(story_to_out(t) * SR)
         if i >= N or i + len(sig) <= 0:
             return
         sig = sig[: N - i] if i >= 0 else sig[-i:][: N]

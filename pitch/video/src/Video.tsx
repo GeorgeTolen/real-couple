@@ -3,7 +3,8 @@ import '@fontsource-variable/onest'
 import '@fontsource-variable/jetbrains-mono'
 import '@fontsource-variable/source-serif-4/wght-italic.css'
 import { useEffect, useState, type ComponentType } from 'react'
-import { AbsoluteFill, continueRender, delayRender, Easing, interpolate, Sequence, useCurrentFrame } from 'remotion'
+import { AbsoluteFill, continueRender, delayRender, Easing, Freeze, interpolate, Sequence, useCurrentFrame } from 'remotion'
+import { outToStory, STORY } from './holds'
 import { S1Title } from './scenes/S1Title'
 import { S2Bias } from './scenes/S2Bias'
 import { S3Goal } from './scenes/S3Goal'
@@ -14,7 +15,8 @@ import { S6bExamples } from './scenes/S6bExamples'
 import { S7Judges } from './scenes/S7Judges'
 import { S8Finale } from './scenes/S8Finale'
 
-export const TOTAL = 900
+/** Длина сюжета в кадрах; выходной ролик длиннее на паузы из holds.json. */
+export const TOTAL = STORY
 /** Шторка между мирами: 8 кадров, по 4 до и после стыка. */
 const WIPE = 8
 /** Стык внутри одного мира: короткое растворение содержимого (фон одинаковый). */
@@ -92,8 +94,8 @@ function Curtain({ at }: { at: number }) {
   )
 }
 
-export function Video() {
-  useFonts()
+/** Сюжет: 900 кадров по раскадровке. */
+function Story() {
   return (
     <AbsoluteFill style={{ background: '#0e3b27' }}>
       {SCENES.map((s, i) => {
@@ -110,5 +112,16 @@ export function Video() {
         <Curtain key={c.at} at={c.at} />
       ))}
     </AbsoluteFill>
+  )
+}
+
+/** Выходной ролик: сюжет с паузами в ключевых моментах (src/holds.json). */
+export function Video() {
+  useFonts()
+  const frame = useCurrentFrame()
+  return (
+    <Freeze frame={outToStory(frame)}>
+      <Story />
+    </Freeze>
   )
 }
