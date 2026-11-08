@@ -380,7 +380,47 @@ function errorText(detail: unknown, status: number): string {
   return `Ошибка запроса, HTTP ${status}`
 }
 
+// Демо на GitHub Pages: ответы API берутся из снимка, действия с моделями недоступны.
+export const STATIC_DEMO = import.meta.env.VITE_STATIC === '1'
+let snapshot: Promise<Record<string, unknown>> | null = null
+
+function snapshotKey(path: string): { path: string; params: URLSearchParams; key: string } {
+  const [bare, search = ''] = path.split('?')
+  const params = new URLSearchParams(search)
+  params.sort()
+  const text = params.toString()
+  return { path: bare, params, key: text ? `${bare}?${text}` : bare }
+}
+
+async function fromSnapshot<T>(path: string, init?: RequestInit): Promise<T> {
+  if (init?.method && init.method !== 'GET') {
+    throw new Error('Это демо-снимок только для просмотра. Оценка, апелляции и правка чек-листа работают в локальной версии.')
+  }
+  snapshot ??= fetch('snapshot.json').then((r) => r.json() as Promise<Record<string, unknown>>)
+  const data = await snapshot
+  const { path: bare, params, key } = snapshotKey(path)
+  if (key in data) return data[key] as T
+  if (bare === '/conversations') {
+    const group = params.get('group_id')
+    const list = (data[group ? `/conversations?group_id=${group}` : '/conversations'] ?? data['/conversations']) as {
+      total: number
+      items: ConversationRow[]
+    }
+    const q = (params.get('q') ?? '').toLowerCase()
+    const status = params.get('status')
+    const items = list.items.filter(
+      (row) =>
+        (!q || row.id.toLowerCase().includes(q) || (row.operator ?? '').toLowerCase().includes(q)) &&
+        (!status || row.status === status),
+    )
+    return { total: items.length, items } as T
+  }
+  if (bare in data) return data[bare] as T
+  throw new Error('В демо-снимке нет этих данных. Полная версия запускается локально, см. README.')
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (STATIC_DEMO) return fromSnapshot<T>(path, init)
   const response = await fetch(`api${path}`, init)
   if (!response.ok) {
     let detail: unknown = null

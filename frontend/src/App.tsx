@@ -5,6 +5,7 @@ import {
   Play24Regular, Search20Regular, ShieldError24Regular,
 } from '@fluentui/react-icons'
 import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { STATIC_DEMO } from './api'
 import { EmptyState } from './components/common'
 import { readStorage, writeStorage } from './format'
 import AnalyticsPage from './pages/AnalyticsPage'
@@ -57,6 +58,11 @@ export default function App() {
   return (
     <RoleContext.Provider value={role}>
       <div className="shell">
+        {STATIC_DEMO && (
+          <div className="demo-banner" role="note">
+            Демо-снимок результатов: просмотр без ключей и моделей. Запуск оценки и апелляции работают в локальной версии.
+          </div>
+        )}
         <header className="topbar">
           <div className="brand">
             <svg width="24" height="26" viewBox="0 0 16 18" aria-hidden="true">
