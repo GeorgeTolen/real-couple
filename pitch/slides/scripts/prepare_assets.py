@@ -13,13 +13,16 @@ OUT = Path(__file__).resolve().parents[1] / "src" / "assets"
 
 # имя исходника -> (имя результата, ширина, качество)
 JOBS = {
-    "c02-octagon-ru-009.png": ("octagon-ru-009.webp", 1152, 92),
+    # слайды 08 и 09: скриншоты в исходном размере, без обрезки, текст реплик читается с 3 метров
+    "14-chat-ru-014-words.png": ("shot-ru-014.webp", 1810, 92),
+    "15-chat-ru-015-words.png": ("shot-ru-015.webp", 1905, 92),
+    # резерв R2: звонок и Whisper
     "05-call-p4-ru-001.png": ("call-p4-ru-001.webp", 1760, 84),
-    # слайд «Демо»: окно приложения
-    "06-gross.png": ("demo-gross.webp", 1080, 72),
-    "02-chat-ru-009-identification.png": ("demo-chat.webp", 1080, 72),
-    "08-checklists.png": ("demo-checklists.webp", 1080, 72),
-    "11-map-operators.png": ("demo-map.webp", 1080, 72),
+    # резерв R3: октагон ru-020 с N/A
+    "c03-octagon-ru-020.png": ("octagon-ru-020.webp", 1152, 90),
+    # резерв R5: апелляции и редактор чек-листа
+    "07-appeals.png": ("demo-appeals.webp", 1440, 82),
+    "08-checklists.png": ("demo-checklists.webp", 1440, 82),
 }
 
 

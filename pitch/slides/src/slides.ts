@@ -1,16 +1,16 @@
 // Содержимое слайдов. Цифры подставляются из data.ts (docs/pitch/data/*.json), текстом не дублируются.
 // Движение привязано к шагам: data-s="N" появляется на шаге N, хуки step() запускают последовательности.
-import { bench, criterion, facts, journey, modelName, node, num, research, researchItem, ROLE, short, step, usd, REPO_URL } from './data'
+import { bench, facts, modelName, num, researchItem, ROLE, short, usd, REPO_URL, DEMO_URL } from './data'
 import type { Model } from './data'
-import octagonUrl from './assets/octagon-ru-009.webp'
+import shot014 from './assets/shot-ru-014.webp'
+import shot015 from './assets/shot-ru-015.webp'
 import callUrl from './assets/call-p4-ru-001.webp'
-import demoGross from './assets/demo-gross.webp'
-import demoChat from './assets/demo-chat.webp'
+import octagon020 from './assets/octagon-ru-020.webp'
+import demoAppeals from './assets/demo-appeals.webp'
 import demoChecklists from './assets/demo-checklists.webp'
-import demoMap from './assets/demo-map.webp'
 import qr from './assets/qr.json'
-import { icons, nodeIcons } from './icons'
-import { EASE_IO, EASE_OUT, EASE_SNAP, T, drawPath, flip, fmt, odometer, still, wait } from './motion'
+import { nodeIcons } from './icons'
+import { EASE_IO, EASE_OUT, T, drawPath, fmt, odometer, still, wait } from './motion'
 
 export type Ctx = { instant: boolean; print: boolean }
 
@@ -40,7 +40,10 @@ const title = (text: string, accent?: string) => {
 }
 
 /** Ортогональный путь со скруглёнными углами. */
-function rounded(points: P[], r = 14): string {
+function rounded(input: P[], r = 14): string {
+  // совпадающие соседние точки дают отрезок нулевой длины и NaN в пути
+  const points = input.filter((p, i) => i === 0 || Math.hypot(p[0] - input[i - 1][0], p[1] - input[i - 1][1]) > 0.5)
+  if (points.length < 2) return `M${input[0][0]} ${input[0][1]}`
   let d = `M${points[0][0]} ${points[0][1]}`
   for (let i = 1; i < points.length - 1; i += 1) {
     const [x0, y0] = points[i - 1]
@@ -109,20 +112,21 @@ function webglOk(): boolean {
 
 const sTitle: Slide = {
   id: 'title',
-  label: 'Журнал контроля',
+  label: 'CQA',
   steps: 2,
   dark: true,
   cls: 's-title',
   html: () => `
     <div class="coins" aria-hidden="true"></div>
     <div class="name">
-      <h1 class="mega" data-sweep>Журнал контроля</h1>
+      <h1 class="mega" data-sweep>CQA</h1>
       <span class="name-line"></span>
-      <p class="lede mask" data-s="1">Контроль качества чатов и звонков Freedom Broker</p>
+      <p class="lede mask" data-s="1">Контроль качества поддержки, которому можно верить</p>
+      <p class="team mask" data-s="2">Журнал контроля для Freedom Broker</p>
     </div>
     ${marquee()}`,
   notes:
-    'Мы команда «Журнала контроля». Это система, которая оценивает каждый чат и звонок поддержки Freedom Broker по чек-листу и показывает, откуда взялась каждая оценка.',
+    'Мы команда «Журнала контроля». Наш продукт оценивает каждый чат и звонок поддержки Freedom Broker по чек-листу. Сегодня покажем не только оценки, но и почему им можно верить.',
   enter(el, ctx) {
     startMarquee(el)
     const host = el.querySelector<HTMLElement>('.coins')!
@@ -164,96 +168,186 @@ export function freezeCoins(): void {
   host.innerHTML = `<img alt="" src="${url}">`
 }
 
-// ---------------------------------------------------------------- 2. Покрытие
-const coverage = researchItem('coverage')
-const HITS = [13, 46, 82]
-const sCover: Slide = {
-  id: 'cover',
-  label: 'Каждый диалог, а не 3%',
-  steps: 3,
-  cls: 's-cover',
-  html: () => {
-    const tiles = Array.from({ length: 100 }, (_, i) => {
-      const r = Math.floor(i / 10)
-      const c = i % 10
-      const x = 4 + c * 52
-      const y = 4 + r * 52
-      return `<g class="${HITS.includes(i) ? 'hit' : ''}" style="--d:${r + c}"><rect x="${x}" y="${y}" width="42" height="42" rx="11"/><path d="M${x + 12} ${y + 22} l6 6 l12 -13"/></g>`
-    }).join('')
-    return `
-    ${title('Каждый диалог, а не 3%', 'Каждый')}
-    <div class="body">
-      <div class="cover-left">
-        <svg class="tiles" viewBox="0 0 524 524" role="img" aria-label="100 диалогов, вручную проверяют 3">${tiles}</svg>
-        <div class="swap">
-          <div data-until="2"><div class="hero-n">2–3%</div><div class="hero-l">проверяют вручную</div><div class="src">${esc(coverage.source)}</div></div>
-          <div data-s="2"><div class="hero-n" data-odo="100%" data-from="003%">100%</div><div class="hero-l">оцениваем мы</div><div class="src">${esc(coverage.applied)}</div></div>
-        </div>
-      </div>
-      <div>
-        <div class="card octa-card" data-s="2" style="transition-delay:.25s"><img src="${octagonUrl}" alt="Октагон качества диалога p1-ru-009: 8 критериев и итог 46,00"></div>
-        <div class="octa-cap mask" data-s="3"><span class="ev">${check(22, '#0e6b3c')}</span>8 критериев, каждый с доказательством</div>
-      </div>
-    </div>`
-  },
-  notes:
-    'Сегодня вручную успевают проверить два-три процента диалогов. Мы оцениваем все, по восьми критериям, и у каждого вывода есть номер реплики как доказательство.',
-}
+// ================================================================ v4: деку ведёт текст выступления
+// Слайды 02–10 идут за сценарием из docs/pitch/PROMPT_slides_v4_script.md. Заметки ведущего = текст сценария.
 
-// ---------------------------------------------------------------- 3. Исследования: колода вырезок
-type Clip = { site: string; title: string; by: string; where: string }
-const QUOTES: { id: string; decision: string }[] = [
-  { id: 'cot', decision: 'Сначала реплики и рассуждение, потом ответ' },
-  { id: 'panel', decision: 'Судьи Gemini и GPT: два разных вендора' },
-  { id: 'consistent_wrong', decision: 'Точность и стабильность меряем отдельно' },
-  { id: 'facts', decision: 'Не выдумывать факты о продуктах Freedom' },
-]
-export const quoteSources = QUOTES
-// Стопка в центре: смещение карточки из своей ячейки к центру сетки 2×2
-const STACK = [
-  { dx: 424, dy: 180, r: -2 },
-  { dx: -424, dy: 180, r: 1.5 },
-  { dx: 424, dy: -180, r: -1 },
-  { dx: -424, dy: -180, r: 2 },
-]
+const TR = facts.trust
+const H = facts.headline
+const NA = facts.na_example
+const INS = facts.instability
+const WE = facts.word_example
+const kappaHuman = fmt(TR.human_ceiling_kappa, 2)
+const kappaOurs = fmt(TR.kappa_holdout, 2)
+const byRole = (role: string) => bench.models.find((m) => m.chosen === role)!
+const judgeA = byRole('judge_A')
+const judgeB = byRole('judge_B')
+const arbiter = byRole('arbiter')
+const gemma = byRole('local_mode')
+const opusModel = bench.models.find((m) => m.model === 'anthropic/claude-opus-5.5')!
+const terraModel = bench.models.find((m) => m.model === 'openai/gpt-6.1-terra')!
+// норматив первой реакции: «SLA 3 мин» в узле signals (backend/app/signals.py, FIRST_REACTION_SEC)
+const FIRST_REACTION = Number((facts.architecture.nodes.find((n) => n.id === 'signals')!.sub.match(/SLA (\d+) мин/) ?? ['', '3'])[1]) * 60
+const okIcon = check
 
-const sResearch: Slide = {
-  id: 'research',
-  label: 'На чём мы стоим',
-  steps: 4,
-  chapter: '01 Исследования',
-  cls: 's-research',
+// ---------------------------------------------------------------- 02. Судья предвзят
+type Bias = { name: string; line: string; chips: string[] }
+const biasOf = (id: string) => (researchItem(id) as { bias?: Bias }).bias!
+const BIAS: Bias[] = [
+  { name: 'Позиционный', line: biasOf('position').line, chips: ['Wang, arXiv 2305.17926', 'EMNLP 2026'] },
+  { name: 'На длину', line: biasOf('zheng').line, chips: ['MT-Bench', 'arXiv 2306.05685'] },
+  { name: 'Нестабильность', line: 'Один и тот же вход, разные решения. А повтор бывает «стабильно, но неверно»', chips: ['Kili 2026'] },
+  { name: 'Потолок людей', line: biasOf('ceiling').line, chips: ['NVIDIA', 'arXiv 2510.09738'] },
+]
+const sBias: Slide = {
+  id: 'bias',
+  label: 'LLM-судья предвзят',
+  steps: BIAS.length,
+  chapter: '01 Проблема',
+  cls: 's-bias4',
   html: () => `
-    ${title('На чём мы стоим', 'стоим')}
+    ${title('LLM-судья предвзят. Это измерено', 'измерено')}
     <div class="body">
-      ${QUOTES.map((entry, i) => {
-        const item = researchItem(entry.id)
-        const clip = (item as { clip?: Clip }).clip!
-        const s = STACK[i]
-        return `<div class="card quote-card custom" data-s="${i + 1}" style="--dx:${s.dx + i * 6}px;--dy:${s.dy + i * 6}px;--r:${s.r}deg;--z:${10 - i}">
-          <figure class="clip">
-            <div class="clip-meta"><span class="mono">${esc(clip.site)}</span><span>${esc(clip.where)}</span></div>
-            <div class="clip-title">${esc(clip.title)}</div>
-            <div class="clip-by">${esc(clip.by)}</div>
-            <blockquote lang="en"><mark>${esc(item.quote ?? '')}</mark></blockquote>
-          </figure>
-          <div class="decision"><span class="ok">${check(20)}</span><span>${esc(entry.decision)}</span></div>
-        </div>`
-      }).join('')}
+      <div class="bias-row">${BIAS.map(
+        (b, i) => `<div class="card bias-card" data-s="${i + 1}">
+          <span class="bn mono">${String(i + 1).padStart(2, '0')}</span>
+          <b>${esc(b.name)}</b><p>${esc(b.line)}</p>
+          <div class="chips">${b.chips.map((c) => `<span class="chip src-chip">${esc(c)}</span>`).join('')}</div>
+        </div>`,
+      ).join('')}</div>
+      <div class="kappa-hero" data-s="${BIAS.length}" style="transition-delay:.35s">
+        <span class="kk">κ</span>
+        <b data-odo="${kappaHuman}">${kappaHuman}</b>
+        <i>эксперты между собой</i>
+        <span class="chip src-chip">NVIDIA, arXiv 2510.09738</span>
+      </div>
     </div>`,
   notes:
-    'Мы не угадывали методику, а взяли приёмы из исследований про LLM-судей. Сначала рассуждение, потом вердикт; второй судья другого вендора; точность и стабильность меряем отдельно; с фактами о продуктах осторожно.',
+    'LLM-as-a-Judge стал доминирующей парадигмой для оценки результатов языковых моделей, но судьи LLM демонстрируют систематические предубеждения, которые ставят под угрозу надёжность оценки. Ссылаясь на исследования arXiv, NVIDIA и другие источники: позиционный перекос, когда порядок вариантов меняет ответ; перекос на длину, когда судья предпочитает длинный и гладкий ответ; нестабильность, когда при одних и тех же входных данных модель выдаёт разные решения. NVIDIA показала, что потолок задачи это согласие людей между собой, каппа около 0,80.',
 }
 
-// ---------------------------------------------------------------- 4. Турнир моделей
-const SC = { W: 1120, H: 600, x0: 88, x1: 1100, y0: 56, y1: 520 }
-const lmin = Math.log10(0.00015)
+// ---------------------------------------------------------------- 03. Цель: стабильность и честность
+type Rub = { id: string; name: string; w?: number }
+const W = NA.weights as Record<string, number>
+const RUBRIC: Rub[] = bench.criteria_difficulty.map((c) => ({ id: c.id, name: c.name, w: W[c.name] }))
+const RUB_PX = 8 // ширина плашки на 1 балл веса
+const sGoal: Slide = {
+  id: 'goal',
+  label: 'Цель: стабильность и честность',
+  steps: 3,
+  cls: 's-goal4',
+  html: () => `
+    <div class="goal-left">
+      <span class="eyebrow">Цель архитектуры</span>
+      <h2 class="title goal-t">Стабильно.<br><em>Честно.</em></h2>
+      <div class="goal-sub" data-s="1">
+        <p><b>Стабильно:</b> тот же диалог, тот же балл</p>
+        <p><b>Честно:</b> каждое снижение доказано репликой</p>
+      </div>
+    </div>
+    <div class="goal-right">
+      <div class="scheme pair" data-s="2">
+        <span class="sl">парное сравнение</span>
+        <div class="plates">${['A', 'B', 'ничья'].map((p) => `<span class="plate p3">${p}</span>`).join('')}</div>
+      </div>
+      <div class="shift" data-s="3">
+        <svg width="40" height="120" viewBox="0 0 40 120" aria-hidden="true"><path class="ar" d="M20 4v106m-12-12 12 12 12-12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/></svg>
+        <span>перекос переезжает в ступени шкалы</span>
+      </div>
+      <div class="scheme rub" data-s="3" style="transition-delay:.25s">
+        <span class="sl">наша рубрика: ${RUBRIC.length} критериев с весами</span>
+        <div class="plates">${RUBRIC.map(
+          (r, i) => `<span class="plate${r.w ? '' : ' gross'}" style="width:${r.w ? r.w * RUB_PX : 96}px;--i:${i}"><i class="mono">${r.id}</i><b class="mono">${r.w ?? 'флаг'}</b></span>`,
+        ).join('')}</div>
+        <div class="rub-names">${RUBRIC.map((r) => `<span style="width:${r.w ? r.w * RUB_PX : 96}px">${esc(r.name)}</span>`).join('')}</div>
+      </div>
+    </div>
+    <div class="goal-rule" data-s="3" style="transition-delay:.6s"><span class="chip src-chip">#12</span>подсказка критерия: снижение только с номером реплики</div>`,
+  notes:
+    'Нашей главной архитектурной целью были стабильность и честность. Исследователи работали с парным сравнением: A лучше, B лучше, ничья. У нас рубрика из 8 критериев с весами, поэтому наш аналог их перекоса это ступени шкалы и формулировки подсказок. Мы прописали в чек-листе такие подсказки, чтобы каждое снижение опиралось на конкретную реплику.',
+}
+
+// ---------------------------------------------------------------- 04. Как мы поймали смещение
+const [run1, run2] = INS.runs
+const sCatch: Slide = {
+  id: 'catch',
+  label: 'Как мы поймали смещение',
+  steps: 3,
+  cls: 's-catch',
+  html: () => `
+    <h2 class="title"><span class="mono-t">${num(run1.total, 2)} → ${num(run2.total, 2)}</span> на <em>одном</em> и том же чате</h2>
+    <div class="body catch">
+      <div class="c-left">
+        <div class="runs-h" data-s="1"><span class="chip src-chip">${esc(INS.dialog)}</span><span>«${esc(INS.criterion)}», шкала ${INS.scale.join(' / ')}</span></div>
+        <div class="rt2 custom" data-s="1">
+          <div class="rr2 rh"><span></span><span>прогон 1</span><span class="c2">прогон 2</span></div>
+          <div class="rr2"><span>Судья A</span><b>${run1.judge_a}</b><b class="c2">${run2.judge_a}</b></div>
+          <div class="rr2"><span>Судья B</span><b>${run1.judge_b}</b><b class="c2">${run2.judge_b}</b></div>
+          <div class="rr2 arb"><span>Арбитр</span><b class="hot">${run1.arbiter}</b><b class="c2 hot bad">${run2.arbiter}</b></div>
+          <div class="rr2 tot"><span>Итог</span><b class="old"><span>${num(run1.total, 2)}</span></b><b class="c2 bad">${num(run2.total, 2)}</b></div>
+        </div>
+        <div class="after2">
+          <div data-s="3"><b data-odo="${esc(TR.stability)}">${esc(TR.stability)}</b><span>ответов совпали на повторном прогоне</span></div>
+          <div data-s="3" style="transition-delay:.2s"><b><span class="kk">κ</span><span data-odo="${kappaOurs}">${kappaOurs}</span></b><span>согласие с эталоном на ${TR.holdout_dialogs} новых чатах</span>
+            <div class="kbar"><i class="kfill" style="--w:${TR.kappa_holdout}"></i><em class="kmark" style="left:${TR.human_ceiling_kappa * 100}%"><s></s><span><b class="mono">${kappaHuman}</b> люди между собой</span></em></div>
+          </div>
+        </div>
+      </div>
+      <div class="layer card" data-s="2">
+        <span class="chip good">новый слой</span>
+        <h3>Проверка согласованности</h3>
+        ${INS.fixes.map((f, i) => `<div class="fx" style="transition-delay:${200 + i * 140}ms"><span class="ok">${okIcon(18)}</span><span>${esc(f)}</span></div>`).join('')}
+      </div>
+    </div>`,
+  notes:
+    'Первые попытки приводили к смещению. Диалог en-006: при первом прогоне 85,00, при втором 80,50. Разброс в 4,5 балла на одном и том же чате нас не устраивал. Оба судьи отвечали одинаково, 10 и 7, а арбитр выбирал то одно, то другое. Мы поставили ещё один слой, проверку согласованности: кеш результата, обязательный арбитр при споре и правило «нет сбоя с номером реплики, нет снижения». После этого на повторном прогоне совпали 95 ответов из 96. На 10 новых чатах согласие с эталоном каппа 0,96 при потолке людей 0,80.',
+}
+
+// ---------------------------------------------------------------- 05. Сценарий 1: локально
+const LOCAL = bench.models.filter((m) => m.fits_8gb_laptop).sort((a, b) => b.accuracy - a.accuracy)
+const gpuIcon = `<svg class="gpu" viewBox="0 0 200 112" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8 16h176a8 8 0 0 1 8 8v56a8 8 0 0 1-8 8H8z"/><path d="M8 8v96"/>
+  <circle cx="64" cy="52" r="24"/><circle cx="64" cy="52" r="6"/><circle cx="136" cy="52" r="24"/><circle cx="136" cy="52" r="6"/>
+  <path d="M36 88v14M52 88v14M68 88v14M84 88v14M100 88v14M116 88v14M132 88v14"/></svg>`
+const sLocal: Slide = {
+  id: 'local',
+  label: 'Сценарий 1: локально',
+  steps: LOCAL.length,
+  chapter: '02 Выбор модели',
+  cls: 's-local4',
+  html: () => `
+    ${title('RTX 5070 Ti, 8 ГБ, бесплатно', 'бесплатно')}
+    <div class="gpu-wrap"><span class="chip good">сценарий 1</span>${gpuIcon}</div>
+    <div class="body">
+      <div class="lhead"><span>модель, помещается в 8 ГБ</span><span>точность против эталона, %</span><span></span><span>RU / KZ / EN</span></div>
+      ${LOCAL.map(
+        (m, i) => `<div class="lrow${m.chosen ? ' pick' : ''}" data-s="${i + 1}">
+          <span class="lname">${modelName(m.model)}</span>
+          <span class="ltrack"><i class="lbar" style="--w:${m.accuracy / 100}"></i></span>
+          <b class="lval mono" data-odo="${num(m.accuracy)}">${num(m.accuracy)}</b>
+          <span class="llang mono">${m.ru} / ${m.kz} / ${m.en}</span>
+        </div>`,
+      ).join('')}
+      <p class="lcap" data-s="${LOCAL.length}" style="transition-delay:.5s"><b>данные не выходят из контура,</b> <span class="mono">${fmt(gemma.accuracy, 0)}%</span> для режима без интернета</p>
+    </div>`,
+  notes:
+    'Выбор модели не случаен, мы исследовали 2 сценария. Локальные LLM развернули на RTX 5070 Ti с 8 ГБ, каждый прогон бесплатно. Топ-5 локально: Gemma 4 26B 83,9%, gpt-oss-20b 70,1%, Granite 66,7%, Ministral 62,1%, Qwen 9B 61,6%. Рабочий режим, когда данные не должны уходить наружу, но для эталонной точности мало.',
+  enter(el, ctx) {
+    if (ctx.instant) return
+    el.querySelectorAll<SVGGeometryElement>('.gpu path, .gpu circle').forEach((p, i) => drawPath(p, T[3], 250 + i * 40))
+  },
+}
+
+// ---------------------------------------------------------------- 06. Сценарий 2: облако
+const CLOUD = bench.models.filter((m) => !m.fits_8gb_laptop)
+const SC = { W: 1664, H: 500, x0: 96, x1: 1640, y0: 40, y1: 440 }
+const lmin = Math.log10(0.0004)
 const lmax = Math.log10(0.05)
 const SX = (v: number) => SC.x0 + ((Math.log10(v) - lmin) / (lmax - lmin)) * (SC.x1 - SC.x0)
-const SY = (acc: number) => SC.y1 - ((acc - 55) / 45) * (SC.y1 - SC.y0)
+const SY = (acc: number) => SC.y1 - ((acc - 75) / 25) * (SC.y1 - SC.y0)
+const priceRatio = Math.round(opusModel.usd_per_dialog / judgeB.usd_per_dialog)
 
-function paretoFront(): Model[] {
-  const sorted = [...bench.models].sort((a, b) => a.usd_per_dialog - b.usd_per_dialog || b.accuracy - a.accuracy)
+function paretoFront(models: Model[]): Model[] {
+  const sorted = [...models].sort((a, b) => a.usd_per_dialog - b.usd_per_dialog || b.accuracy - a.accuracy)
   const front: Model[] = []
   let best = -1
   for (const model of sorted) {
@@ -265,29 +359,26 @@ function paretoFront(): Model[] {
   return front
 }
 
-type Tag = { model: Model; role: string; muted?: boolean; lift?: boolean; extra?: string; leader: (cx: number, cy: number) => P[]; at: (cx: number, cy: number) => { x: number; y: number; align: 'left' | 'right' | 'center' } }
-const byRole = (role: string) => bench.models.find((m) => m.chosen === role)!
-const opusModel = bench.models.find((m) => m.model === 'anthropic/claude-opus-5.5')!
+type Tag = { model: Model; role: string; muted?: boolean; lift?: boolean; leader: (cx: number, cy: number) => P[]; at: (cx: number, cy: number) => { x: number; y: number; align: 'left' | 'right' } }
 const TAGS: Tag[] = [
-  { model: byRole('judge_B'), role: ROLE.judge_B, lift: true, leader: (x, y) => [[x - 12, y - 12], [x - 40, y - 40], [x - 40, y - 64]], at: (x, y) => ({ x: x - 40, y: y - 64, align: 'right' }) },
-  { model: byRole('judge_A'), role: ROLE.judge_A, lift: true, leader: (x, y) => [[x + 12, y - 12], [x + 30, y - 30], [x + 30, y - 72]], at: (x, y) => ({ x: x + 30, y: y - 72, align: 'left' }) },
-  { model: byRole('arbiter'), role: ROLE.arbiter, lift: true, leader: (x, y) => [[x - 6, y + 16], [x - 24, y + 64]], at: (x, y) => ({ x: x - 24, y: y + 64, align: 'right' }) },
-  { model: byRole('local_mode'), role: ROLE.local_mode, leader: (x, y) => [[x, y - 17], [x, y - 64]], at: (x, y) => ({ x: x - 36, y: y - 64, align: 'left' }) },
-  { model: opusModel, role: 'Дороже всех', muted: true, extra: usd(opusModel.usd_per_dialog), leader: (x, y) => [[x, y + 17], [x, y + 140]], at: (x, y) => ({ x: x + 14, y: y + 140, align: 'right' }) },
+  { model: judgeB, role: ROLE.judge_B, lift: true, leader: (x, y) => [[x - 12, y - 10], [x - 40, y - 38], [x - 60, y - 38]], at: (x, y) => ({ x: x - 60, y: y - 38, align: 'right' }) },
+  { model: judgeA, role: ROLE.judge_A, lift: true, leader: (x, y) => [[x + 12, y - 10], [x + 40, y - 38], [x + 60, y - 38]], at: (x, y) => ({ x: x + 60, y: y - 38, align: 'left' }) },
+  { model: arbiter, role: ROLE.arbiter, lift: true, leader: (x, y) => [[x + 12, y + 10], [x + 40, y + 34], [x + 60, y + 34]], at: (x, y) => ({ x: x + 60, y: y + 34, align: 'left' }) },
+  { model: opusModel, role: `×${priceRatio} по цене`, muted: true, leader: (x, y) => [[x, y + 14], [x, y + 96]], at: (x, y) => ({ x: x + 16, y: y + 116, align: 'right' }) },
+  { model: terraModel, role: 'та же семья, что Sol', muted: true, leader: (x, y) => [[x - 12, y - 8], [x - 40, y - 30], [x - 52, y - 30]], at: (x, y) => ({ x: x - 52, y: y - 30, align: 'right' }) },
 ]
 
 function scatter(): string {
   const { x0, x1, y0, y1 } = SC
-  const front = paretoFront()
+  const front = paretoFront(CLOUD)
   const frontIds = new Set(front.map((m) => m.model))
-  const yTicks = [60, 70, 80, 90, 100]
-  const xTicks = [0.0002, 0.001, 0.005, 0.02]
+  const yTicks = [75, 80, 85, 90, 95, 100]
+  const xTicks = [0.0005, 0.001, 0.005, 0.01, 0.03]
   const grid =
-    yTicks.map((t, i) => `<line class="gl draw" data-s="1" pathLength="1" style="transition-delay:${i * 60}ms" x1="${x0}" x2="${x1}" y1="${SY(t)}" y2="${SY(t)}"/>`).join('') +
-    xTicks.map((t, i) => `<line class="gl draw" data-s="1" pathLength="1" style="transition-delay:${200 + i * 60}ms" x1="${SX(t)}" x2="${SX(t)}" y1="${y1}" y2="${y0 - 8}"/>`).join('')
+    yTicks.map((t) => `<line class="gl" x1="${x0}" x2="${x1}" y1="${SY(t)}" y2="${SY(t)}"/>`).join('') +
+    xTicks.map((t) => `<line class="gl" x1="${SX(t)}" x2="${SX(t)}" y1="${y1}" y2="${y0 - 8}"/>`).join('')
   const yLabels = yTicks.map((t) => `<text class="tick num" x="${x0 - 16}" y="${SY(t) + 6}" text-anchor="end">${t}</text>`).join('')
-  const xLabels = xTicks.map((t) => `<text class="tick num" x="${SX(t)}" y="${y1 + 34}" text-anchor="middle">${usd(t)}</text>`).join('')
-
+  const xLabels = xTicks.map((t) => `<text class="tick num" x="${SX(t)}" y="${y1 + 32}" text-anchor="middle">${usd(t)}</text>`).join('')
   const pts: P[] = []
   front.forEach((m, i) => {
     const x = SX(m.usd_per_dialog)
@@ -298,32 +389,27 @@ function scatter(): string {
   pts.push([x1, pts[pts.length - 1][1]])
   const stairs = 'M' + pts.map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L')
   const area = stairs + ` L${x1} ${y1} L${pts[0][0].toFixed(1)} ${y1} Z`
-
-  const byPrice = [...bench.models].sort((a, b) => a.usd_per_dialog - b.usd_per_dialog).map((m) => m.model)
+  const byPrice = [...CLOUD].sort((a, b) => a.usd_per_dialog - b.usd_per_dialog).map((m) => m.model)
   const lifted = new Set(TAGS.filter((t) => t.lift).map((t) => t.model.model))
-  const dots = bench.models
-    .map((m) => {
-      const cx = SX(m.usd_per_dialog).toFixed(1)
-      const cy = SY(m.accuracy).toFixed(1)
-      const cls = `pt${frontIds.has(m.model) ? ' front-c' : ''}${lifted.has(m.model) ? ' lift' : ''}`
-      return `<g class="pt-g" data-m="${m.model}" data-cx="${cx}" data-cy="${cy}"><circle class="${cls}" style="--i:${byPrice.indexOf(m.model)}" cx="${cx}" cy="${cy}" r="9"/></g>`
-    })
-    .join('')
-
+  const dots = CLOUD.map((m) => {
+    const cx = SX(m.usd_per_dialog).toFixed(1)
+    const cy = SY(m.accuracy).toFixed(1)
+    const cls = `pt${frontIds.has(m.model) ? ' front-c' : ''}${lifted.has(m.model) ? ' lift' : ''}`
+    return `<g class="pt-g" data-m="${m.model}" data-cx="${cx}" data-cy="${cy}"><circle class="${cls}" style="--i:${byPrice.indexOf(m.model)}" cx="${cx}" cy="${cy}" r="9"/></g>`
+  }).join('')
   const rings = TAGS.map((t) => {
     const cx = SX(t.model.usd_per_dialog)
     const cy = SY(t.model.accuracy)
     const muted = t.muted ? ' muted' : ''
-    return `<circle class="ring${muted}" cx="${cx}" cy="${cy}" r="17"/>${t.lift ? `<circle class="pulse" cx="${cx}" cy="${cy}" r="17"/>` : ''}<path class="leader${muted}" d="${rounded(t.leader(cx, cy), 10)}"/>`
+    return `<circle class="ring${muted}" cx="${cx}" cy="${cy}" r="16"/>${t.lift ? `<circle class="pulse" cx="${cx}" cy="${cy}" r="16"/>` : ''}<path class="leader${muted}" d="${rounded(t.leader(cx, cy), 8)}"/>`
   }).join('')
-
-  return `<svg class="scatter" viewBox="0 0 ${SC.W} ${SC.H}" role="img" aria-label="Точность и цена 16 моделей">
-    <defs><linearGradient id="paretoFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#138a4e" stop-opacity=".16"/><stop offset="1" stop-color="#138a4e" stop-opacity="0"/></linearGradient></defs>
+  return `<svg class="scatter" viewBox="0 0 ${SC.W} ${SC.H}" role="img" aria-label="Точность и цена ${CLOUD.length} облачных моделей">
+    <defs><linearGradient id="paretoFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#138a4e" stop-opacity=".14"/><stop offset="1" stop-color="#138a4e" stop-opacity="0"/></linearGradient></defs>
     <g class="grid">${grid}</g>${yLabels}${xLabels}
-    <text class="axis-t" x="${x0 - 16}" y="${y0 - 28}" text-anchor="end">точность, %</text>
-    <text class="axis-t" x="${x1}" y="${y1 + 70}" text-anchor="end">цена за диалог, логарифмическая шкала</text>
+    <text class="axis-t" x="${x0 - 16}" y="${y0 - 16}" text-anchor="end">точность, %</text>
+    <text class="axis-t" x="${x1}" y="${y1 + 64}" text-anchor="end">цена за диалог, логарифмическая шкала</text>
     <path class="area custom" data-s="2" d="${area}" fill="url(#paretoFill)"/>
-    <path class="stairs draw" data-s="2" pathLength="1" d="${stairs}"/>
+    <path class="stairs draw" data-s="2" pathLength="1" style="transition-delay:300ms" d="${stairs}"/>
     <g class="pts custom" data-s="1">${dots}</g>
     <g class="rings custom" data-s="3">${rings}</g>
   </svg>`
@@ -334,10 +420,9 @@ function tagsHtml(): string {
     const cx = SX(t.model.usd_per_dialog)
     const cy = SY(t.model.accuracy)
     const p = t.at(cx, cy)
-    const shift = p.align === 'right' ? '-100%' : p.align === 'center' ? '-50%' : '0'
-    const yShift = p.y < cy ? '-100%' : '0'
-    return `<div class="tag${t.muted ? ' muted' : ''}" style="left:${p.x}px;top:${p.y}px;--tx:${shift};--ty:${yShift};--fx:${(cx - p.x) * 0.4}px;--fy:${(cy - p.y) * 0.4}px;transition-delay:${200 + i * 70}ms">
-      <b>${esc(t.role)}</b><span>${modelName(t.model.model)}${t.extra ? ', ' + t.extra : ''}</span><em data-odo="${num(t.model.accuracy)}">${num(t.model.accuracy)}</em></div>`
+    const shift = p.align === 'right' ? '-100%' : '0'
+    return `<div class="tag${t.muted ? ' muted' : ''}" style="left:${p.x}px;top:${p.y}px;--tx:${shift};--ty:-50%;--fx:${(cx - p.x) * 0.4}px;--fy:${(cy - p.y) * 0.4}px;transition-delay:${200 + i * 90}ms">
+      <b>${esc(t.role)}</b><span>${modelName(t.model.model)}</span><em data-odo="${num(t.model.accuracy)}">${num(t.model.accuracy)}</em></div>`
   }).join('')
 }
 
@@ -386,41 +471,32 @@ function magnet(el: HTMLElement): void {
   })
 }
 
-const sTour: Slide = {
-  id: 'tournament',
-  label: 'Модель выбрали турниром',
-  steps: 3,
-  chapter: '02 Турнир моделей',
-  cls: 's-tour',
-  html: () => {
-    const top = [...bench.models].sort((a, b) => b.accuracy - a.accuracy).slice(0, 5)
-    return `
-    ${title('Модель выбрали турниром', 'турниром')}
+const sec10 = H.seconds_10_chats.split(' ')[0]
+const sCloud: Slide = {
+  id: 'cloud',
+  label: 'Сценарий 2: облако',
+  steps: 4,
+  cls: 's-cloud4',
+  html: () => `
+    ${title('Облако: цена и точность', 'цена')}
+    <div class="cloud-meta"><span class="chip good">сценарий 2</span><span class="chip src-chip">${bench.models.length} моделей · 12 размеченных чатов · на графике ${CLOUD.length} облачных</span></div>
     <div class="body">
       <div class="chart">
         ${scatter()}
         <div class="tags custom" data-s="3">${tagsHtml()}</div>
         <div class="legend-row">
           <span><i style="width:14px;height:14px;border-radius:50%;background:var(--neutral)"></i>модель</span>
-          <span data-s="2"><i style="width:28px;height:3px;background:var(--accent)"></i>граница Парето</span>
-          <span data-s="3"><i style="width:22px;height:22px;border-radius:50%;border:2.5px solid var(--chrome)"></i>выбрана</span>
+          <span><i style="width:28px;height:3px;background:var(--accent)"></i>граница Парето</span>
+          <span><i style="width:20px;height:20px;border-radius:50%;border:2.5px solid var(--chrome)"></i>выбрана</span>
         </div>
-        <div class="cap tour-cap">${bench.models.length} моделей на 12 DEV-чатах: 6 RU, 3 KZ, 3 EN, ручной эталон</div>
       </div>
-      <div class="top5" data-s="1" style="transition-delay:.3s">
-        <h3>Топ-5 по точности</h3>
-        <div class="head"><span>Модель</span><span>Всего</span><span>KZ</span></div>
-        <div class="rows">${top
-          .map(
-            (m) => `<div class="r${m.chosen ? ' chosen' : ''}"><div class="m">${modelName(m.model)}${m.chosen ? `<span class="role">${ROLE[m.chosen]}</span>` : ''}</div>
-            <div class="v">${num(m.accuracy)}</div><div class="kz${m.kz === 100 ? ' full' : ''}">${m.kz}</div></div>`,
-          )
-          .join('')}</div>
+      <div class="cloud-foot">
+        <div data-s="4"><b data-odo="${usd(H.usd_per_dialog)}">${usd(H.usd_per_dialog)}</b><span>за диалог: два судьи и арбитр</span></div>
+        <div data-s="4" style="transition-delay:.15s"><b data-odo="${sec10} с">${sec10} с</b><span>на ${H.seconds_10_chats.includes('до') ? '10 чатов, лучший прогон' : '10 чатов'}</span></div>
       </div>
-    </div>`
-  },
+    </div>`,
   notes:
-    'Модель выбирали на своём эталоне: двенадцать диалогов на трёх языках, шестнадцать моделей. Самая дорогая, Claude Opus, не самая точная: GPT-6.1 Sol и Gemini 3.8 Flash точнее и дешевле.',
+    'Облачные модели: 16 моделей на 12 размеченных чатах, точность и цена одного запроса. Первая тройка показала схожие результаты: GPT-6.1 Sol 97,7%, Gemini 3.8 Flash 96,2%, Gemini 4 Argon 95,4%. Claude Opus 94%, но в 4 раза дороже. По соотношению цена и качество выиграли эти модели. Итог: $0,021 за диалог, 10 чатов за 83 секунды.',
   enter(el) {
     magnet(el)
   },
@@ -433,41 +509,43 @@ const sTour: Slide = {
   },
 }
 
-// ---------------------------------------------------------------- 5. Архитектура
-const NODE_W = 200
-const NODE_H = 160
-const COL = [124, 360, 596, 832, 1068, 1304, 1540]
-const ROW = [130, 360, 590]
+// ---------------------------------------------------------------- 07. Архитектура: токен ru-014 по конвейеру
+const NW = 176
+const NH = 150
+const BIG = { w: 300, h: 200 }
 const POS: Record<string, P> = {
-  api: [COL[0], ROW[0]], norm: [COL[0], ROW[1]], signals: [COL[0], ROW[2]],
-  compile: [COL[1], ROW[1]],
-  judgeA: [COL[2], ROW[0]], judgeB: [COL[2], ROW[2]],
-  check: [COL[3], ROW[1]],
-  arbiter: [COL[4], ROW[0]],
-  score: [COL[5], ROW[1]],
-  ui: [COL[6], ROW[0]], appeal: [COL[6], ROW[1]], export: [COL[6], ROW[2]],
+  api: [88, 105], norm: [88, 330], signals: [374, 330], compile: [660, 330],
+  judgeA: [884, 105], judgeB: [884, 555], check: [1108, 330],
+  arbiter: [1332, 105], score: [1332, 330],
+  ui: [1556, 105], appeal: [1556, 330], export: [1556, 555],
 }
-const COLUMN_OF: Record<string, number> = { api: 0, norm: 0, signals: 0, compile: 1, judgeA: 2, judgeB: 2, check: 3, arbiter: 4, score: 5, ui: 6, appeal: 6, export: 6 }
-const hw = NODE_W / 2
-const hh = NODE_H / 2
+const COLUMN_OF: Record<string, number> = { api: 0, norm: 0, signals: 1, compile: 2, judgeA: 3, judgeB: 3, check: 4, arbiter: 5, score: 5, ui: 6, appeal: 6, export: 6 }
 const AI = new Set(['judgeA', 'judgeB', 'arbiter'])
+const size = (id: string) => (id === 'signals' ? BIG : { w: NW, h: NH })
+const R = (id: string) => POS[id][0] + size(id).w / 2
+const L = (id: string) => POS[id][0] - size(id).w / 2
+const T0 = (id: string) => POS[id][1] - size(id).h / 2
+const B = (id: string) => POS[id][1] + size(id).h / 2
+const END = 3 // зазор под наконечник
 
+/** Маршрут ребра: от края узла к краю узла, ортогонально. */
 function route(from: string, to: string): P[] {
   const [ax, ay] = POS[from]
   const [bx, by] = POS[to]
-  const end = 3
-  if (ax === bx) return ay < by ? [[ax, ay + hh], [bx, by - hh - end]] : [[ax, ay - hh], [bx, by + hh + end]]
-  if (from === 'score' && to === 'ui') return [[ax, ay - hh], [ax, by], [bx - hw - end, by]]
-  if (from === 'score' && to === 'export') return [[ax, ay + hh], [ax, by], [bx - hw - end, by]]
-  if (from === 'appeal' && to === 'score') return [[ax - hw, ay], [bx + hw + end, by]]
-  if (ay === by) return [[ax + hw, ay], [bx - hw - end, by]]
-  const mid = (ax + hw + bx - hw) / 2
-  return [[ax + hw, ay], [mid, ay], [mid, by], [bx - hw - end, by]]
+  if (from === 'score' && to === 'ui') return [[R(from), ay - 20], [R(from) + 24, ay - 20], [R(from) + 24, by], [L(to) - END, by]]
+  if (from === 'score' && to === 'export') return [[R(from), ay + 20], [R(from) + 24, ay + 20], [R(from) + 24, by], [L(to) - END, by]]
+  if (from === 'appeal' && to === 'score') return [[L(from), ay], [R(to) + END, by]]
+  if (ax === bx) return ay < by ? [[ax, B(from)], [bx, T0(to) - END]] : [[ax, T0(from)], [bx, B(to) + END]]
+  if (ay === by) return [[R(from), ay], [L(to) - END, by]]
+  const mid = (R(from) + L(to)) / 2
+  return [[R(from), ay], [mid, ay], [mid, by], [L(to) - END, by]]
 }
-/** Маршрут токена: тот же путь, но от центра узла к центру узла. */
+/** Где стоит токен внутри узла: в «Фактах кодом» ниже текста, в остальных по центру. */
+const anchor = (id: string): P => (id === 'signals' ? [POS[id][0], POS[id][1] + 42] : POS[id])
+/** Маршрут токена: тот же путь, но от точки узла к точке узла. */
 function tokenPath(from: string, to: string): string {
   const pts = route(from, to)
-  return rounded([POS[from], ...pts.slice(0, -1), POS[to]].filter((p, i, arr) => i === 0 || p[0] !== arr[i - 1][0] || p[1] !== arr[i - 1][1]), 14)
+  return rounded([anchor(from), ...pts.slice(0, -1), anchor(to)].filter((p, i, arr) => i === 0 || p[0] !== arr[i - 1][0] || p[1] !== arr[i - 1][1]), 14)
 }
 
 function wrap(text: string, max: number): string[] {
@@ -484,77 +562,67 @@ function wrap(text: string, max: number): string[] {
   return lines
 }
 
-const HIGHLIGHT: Record<number, { nodes: string[]; edges: string[]; text: string }> = {
-  2: { nodes: ['check', 'arbiter'], edges: ['check>arbiter', 'arbiter>score'], text: 'Арбитр только по спорным критериям' },
-  3: { nodes: ['score', 'signals', 'norm'], edges: [], text: 'Факты и баллы считает код, а не модель' },
-  4: { nodes: ['compile'], edges: ['compile>judgeA', 'compile>judgeB'], text: 'Чек-лист → промпт: новый критерий без кода' },
-}
-
-const BANDS = [
-  { x: 8, w: 466, label: 'Готовит код', k: 'без LLM', ai: false },
-  { x: 482, w: 700, label: 'Оценивают модели', k: 'LLM', ai: true },
-  { x: 1190, w: 466, label: 'Итог считает код', k: 'без LLM', ai: false },
-]
-const NA = facts.na_example
+const FLAGS = ['первая реплика оператора и кто до него', `пауза > ${FIRST_REACTION} с`, 'приветствие: формальное / неформальное', 'эскалация', 'личность подтверждена']
+const TOKEN_ID = WE.left.dialog.replace(/^p\d-/, '')
 
 function arch(): string {
-  const bands = BANDS.map(
-    (b) => `<g class="band-g"><rect class="band${b.ai ? ' ai' : ''}" x="${b.x}" y="0" width="${b.w}" height="690" rx="28"/>
-      <text class="band-l${b.ai ? ' ai' : ''}" x="${b.x + 24}" y="34">${b.label}</text><text class="band-k" x="${b.x + b.w - 24}" y="34" text-anchor="end">${b.k}</text></g>`,
-  ).join('')
-
   const edges = facts.architecture.edges
     .map(([from, to]) => {
       const pts = route(from, to)
       const col = from === 'appeal' ? 7 : Math.max(COLUMN_OF[from], COLUMN_OF[to])
-      const id = `e-${from}-${to}`
-      const len = pathLength(pts)
-      const dur = Math.max(0.9, len / 160).toFixed(2)
-      const packet = from === 'appeal' ? '' : `<circle class="packet" r="4"><animateMotion dur="${dur}s" begin="${(col * 0.35).toFixed(2)}s" repeatCount="indefinite" calcMode="linear"><mpath href="#${id}"/></animateMotion></circle>`
-      return `<g class="edge-g" data-e="${from}>${to}"><path id="${id}" class="edge draw" data-s="1" pathLength="1" style="transition-delay:${col * 130 + 120}ms" marker-end="url(#ah)" d="${rounded(pts, 14)}"/><g class="packets">${packet}</g></g>`
+      const back = from === 'appeal' ? ' back' : ''
+      return `<g class="edge-g" data-e="${from}>${to}"><path class="edge draw${back}" data-s="1" pathLength="1" style="transition-delay:${col * 120 + 120}ms" marker-end="url(#ah)" d="${rounded(pts, 12)}"/></g>`
     })
     .join('')
-
   const nodes = facts.architecture.nodes
     .map((entry) => {
-      const [x, y] = POS[entry.id]
-      const left = x - hw
-      const top = y - hh
-      const label = wrap(entry.label, 14)
-      const sub = wrap(entry.sub, 20)
+      const big = entry.id === 'signals'
+      const { w, h } = size(entry.id)
+      const left = L(entry.id)
+      const top = T0(entry.id)
       const isAi = AI.has(entry.id)
       const letter = entry.id === 'judgeA' ? 'A' : entry.id === 'judgeB' ? 'B' : ''
       const glyph = letter
-        ? `<text class="letter" x="${left + 36}" y="${top + 42}" text-anchor="middle">${letter}</text>`
-        : `<g class="ico" transform="translate(${left + 24} ${top + 24})">${nodeIcons[entry.id]}</g>`
-      const ly = top + 86
-      return `<g class="node${isAi ? ' ai' : ''}" data-n="${entry.id}" data-s="1" style="transition-delay:${COLUMN_OF[entry.id] * 130}ms">
-        <rect class="box" x="${left}" y="${top}" width="${NODE_W}" height="${NODE_H}" rx="18" filter="url(#soft)"/>
-        <rect class="chipbg" x="${left + 16}" y="${top + 16}" width="40" height="40" rx="12"/>
+        ? `<text class="letter" x="${left + 34}" y="${top + 40}" text-anchor="middle">${letter}</text>`
+        : `<g class="ico" transform="translate(${left + 22} ${top + 22})">${nodeIcons[entry.id]}</g>`
+      if (big)
+        return `<g class="node big" data-n="${entry.id}" data-s="1" style="transition-delay:${COLUMN_OF[entry.id] * 120}ms">
+          <rect class="box" x="${left}" y="${top}" width="${w}" height="${h}" rx="22" filter="url(#soft)"/>
+          <rect class="chipbg" x="${left + 16}" y="${top + 16}" width="40" height="40" rx="12"/>${glyph}
+          <text class="lb" x="${left + 72}" y="${top + 46}">${esc(entry.label)}</text>
+          ${wrap(entry.sub, 30).map((line, i) => `<text class="sub" x="${left + 20}" y="${top + 90 + i * 22}">${esc(line)}</text>`).join('')}
+          <text class="sub k" x="${left + 20}" y="${top + h - 20}">без LLM, до вызова моделей</text>
+        </g>`
+      const label = wrap(entry.label, 13)
+      const sub = wrap(entry.sub, 19)
+      const ly = top + 82
+      return `<g class="node${isAi ? ' ai' : ''}" data-n="${entry.id}" data-s="1" style="transition-delay:${COLUMN_OF[entry.id] * 120}ms">
+        <rect class="box" x="${left}" y="${top}" width="${w}" height="${h}" rx="18" filter="url(#soft)"/>
+        <rect class="chipbg" x="${left + 14}" y="${top + 14}" width="40" height="40" rx="12"/>
         ${glyph}
-        ${label.map((line, i) => `<text class="l" x="${left + 18}" y="${ly + i * 23}">${esc(line)}</text>`).join('')}
-        ${sub.map((line, i) => `<text class="sub" x="${left + 18}" y="${ly + label.length * 23 + 2 + i * 19}">${esc(line)}</text>`).join('')}
+        ${label.map((line, i) => `<text class="l" x="${left + 16}" y="${ly + i * 21}">${esc(line)}</text>`).join('')}
+        ${sub.map((line, i) => `<text class="sub" x="${left + 16}" y="${ly + label.length * 21 + 2 + i * 18}">${esc(line)}</text>`).join('')}
       </g>`
     })
     .join('')
-
-  const pill = (cls: string, text: string, x: number, y: number, el: string) => {
-    const w = text.length * 8.6 + 28
-    return `<g class="pill ${cls}" data-el="${el}" data-s="1" style="transition-delay:900ms"><rect x="${x - w / 2}" y="${y - 15}" width="${w}" height="30" rx="15"/><text x="${x}" y="${y + 5}" text-anchor="middle">${text}</text></g>`
+  const pill = (cls: string, text: string, x: number, y: number) => {
+    const w = text.length * 8.4 + 26
+    return `<g class="pill ${cls}" data-s="1" style="transition-delay:1000ms"><rect x="${x - w / 2}" y="${y - 14}" width="${w}" height="28" rx="14"/><text x="${x}" y="${y + 5}" text-anchor="middle">${text}</text></g>`
   }
-  const midCheckArb = (POS.check[0] + hw + POS.arbiter[0] - hw) / 2
-
-  return `<svg class="arch custom" viewBox="0 0 1664 690" role="img" aria-label="Схема: подготовка кодом, два судьи и арбитр, итог кодом, карточка, апелляция, экспорт">
+  const midArb = R('check') + 24
+  return `<svg class="arch4 custom" viewBox="0 0 1664 700" role="img" aria-label="Конвейер: нормализация, факты кодом, два судьи, проверка, арбитр при споре, баллы кодом">
     <defs>${chevron('ah')}
       <filter id="soft" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0e3b27" flood-opacity=".09"/></filter>
     </defs>
-    ${bands}${edges}${nodes}
-    ${pill('warn', 'спор', midCheckArb, (ROW[0] + ROW[1]) / 2 + 10, 'check>arbiter')}
-    ${pill('good', 'судьи согласны', COL[4], ROW[1] + 44, 'check>score')}
+    ${edges}${nodes}
+    ${pill('warn', 'при споре', midArb, 218)}
+    <g class="legend4" data-s="1" style="transition-delay:1100ms"><g transform="translate(1468 684)">
+      <rect x="0" y="-14" width="18" height="18" rx="5" class="lg-ai"/><text x="28" y="0">LLM</text>
+      <rect x="92" y="-14" width="18" height="18" rx="5" class="lg-code"/><text x="120" y="0">код</text>
+    </g></g>
   </svg>`
 }
 
-// Токен диалога по конвейеру
 let tokenRun = 0
 function clearTokens(el: HTMLElement): void {
   tokenRun += 1
@@ -570,491 +638,275 @@ function makeToken(layer: HTMLElement, text: string, red = false): HTMLElement {
   layer.append(t)
   return t
 }
-function ride(t: HTMLElement, from: string, to: string, ms?: number): Promise<void> {
-  const d = tokenPath(from, to)
-  t.style.offsetPath = `path('${d}')`
-  const dur = ms ?? 420
-  const a = t.animate([{ offsetDistance: '0%' }, { offsetDistance: '100%' }], { duration: dur, easing: EASE_IO, fill: 'forwards' })
+function ride(t: HTMLElement, from: string, to: string, ms = 420): Promise<void> {
+  t.style.offsetPath = `path('${tokenPath(from, to)}')`
+  const a = t.animate([{ offsetDistance: '0%' }, { offsetDistance: '100%' }], { duration: ms, easing: EASE_IO, fill: 'forwards' })
   return a.finished.then(() => undefined).catch(() => undefined)
 }
+function park(t: HTMLElement, at: string): void {
+  const [x, y] = anchor(at)
+  t.style.offsetPath = `path('M${x} ${y} L${x + 0.01} ${y}')`
+  t.style.offsetDistance = '0%'
+}
+/** Узел «вдыхает» при проходе токена: обводка 1,5 → 3 px и обратно. Без свечения. */
 function breathe(el: HTMLElement, id: string): void {
   const box = el.querySelector<SVGRectElement>(`[data-n="${id}"] .box`)
-  box?.animate([{ strokeWidth: 1.5, stroke: 'var(--accent-glow)' }, { strokeWidth: 3, stroke: 'var(--accent-glow)' }, { strokeWidth: 1.5 }], { duration: 300, easing: EASE_IO })
+  box?.animate([{ strokeWidth: 1.5 }, { strokeWidth: 3, stroke: 'var(--accent)' }, { strokeWidth: 1.5 }], { duration: 300, easing: EASE_IO })
 }
 function showScore(el: HTMLElement, instant: boolean): void {
   const badge = el.querySelector<HTMLElement>('.score-badge')!
   const v = badge.querySelector<HTMLElement>('em')!
   if (badge.classList.contains('on')) return
   badge.classList.add('on')
-  if (instant) v.textContent = num(NA.total, 2)
-  else void odometer(v, num(NA.total, 2), { from: '00,00' })
+  if (instant) v.textContent = num(WE.left.total, 2)
+  else void odometer(v, num(WE.left.total, 2), { from: '00,00' })
 }
-async function runToken(el: HTMLElement, dispute: boolean): Promise<void> {
+/** Шаг 1: токен доезжает до «Фактов кодом». Последний шаг: раздваивается на судей, спор уходит к арбитру, балл кодом. */
+async function tokenIn(el: HTMLElement): Promise<void> {
   clearTokens(el)
   const run = tokenRun
   const layer = el.querySelector<HTMLElement>('.tokens')!
-  const alive = () => run === tokenRun
-  const id = NA.dialog.replace(/^p\d-/, '')
-  const a = makeToken(layer, id)
-  if (!dispute) {
-    for (const [f, t] of [['api', 'norm'], ['norm', 'signals'], ['signals', 'compile']] as const) {
-      await ride(a, f, t, 360)
-      if (!alive()) return
-    }
-  } else {
-    a.style.offsetPath = `path('${tokenPath('compile', 'judgeA')}')`
+  const a = makeToken(layer, TOKEN_ID)
+  park(a, 'api')
+  await wait(1100)
+  for (const [f, t] of [['api', 'norm'], ['norm', 'signals']] as const) {
+    if (run !== tokenRun) return
+    await ride(a, f, t, 420)
+    breathe(el, t)
   }
-  const b = makeToken(layer, id)
+}
+async function tokenOut(el: HTMLElement): Promise<void> {
+  clearTokens(el)
+  const run = tokenRun
+  const alive = () => run === tokenRun
+  const layer = el.querySelector<HTMLElement>('.tokens')!
+  el.querySelector('.score-badge')?.classList.remove('on')
+  const a = makeToken(layer, TOKEN_ID)
+  park(a, 'signals')
+  await ride(a, 'signals', 'compile', 380)
+  if (!alive()) return
+  const b = makeToken(layer, TOKEN_ID)
   await Promise.all([ride(a, 'compile', 'judgeA', 460), ride(b, 'compile', 'judgeB', 460)])
   if (!alive()) return
   breathe(el, 'judgeA')
   breathe(el, 'judgeB')
-  await wait(220)
+  await wait(200)
   await Promise.all([ride(a, 'judgeA', 'check', 460), ride(b, 'judgeB', 'check', 460)])
   if (!alive()) return
+  breathe(el, 'check')
   b.remove()
-  if (dispute) {
-    const r = makeToken(layer, id, true)
-    await Promise.all([ride(a, 'check', 'score', 700), (async () => {
-      await ride(r, 'check', 'arbiter', 420)
+  const r = makeToken(layer, TOKEN_ID, true)
+  await Promise.all([
+    ride(a, 'check', 'score', 760),
+    (async () => {
+      await ride(r, 'check', 'arbiter', 400)
       breathe(el, 'arbiter')
-      await wait(200)
-      await ride(r, 'arbiter', 'score', 420)
-    })()])
-    if (!alive()) return
-    r.remove()
-  } else {
-    await ride(a, 'check', 'score', 640)
-    if (!alive()) return
-  }
+      await wait(160)
+      await ride(r, 'arbiter', 'score', 360)
+    })(),
+  ])
+  if (!alive()) return
+  r.remove()
+  breathe(el, 'score')
   a.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(.8)' }], { duration: T[1], fill: 'forwards' })
   showScore(el, false)
 }
 
+const ARCH_STEPS = 2 + FLAGS.length
 const sArch: Slide = {
   id: 'architecture',
-  label: 'Два судьи и арбитр',
-  steps: 4,
-  chapter: '03 Конвейер оценки',
-  cls: 's-arch',
+  label: 'Архитектура',
+  steps: ARCH_STEPS,
+  chapter: '03 Архитектура',
+  cls: 's-arch4',
   html: () => `
-    ${title('Два судьи и арбитр', 'арбитр')}
-    <div class="callouts">${[2, 3, 4].map((n) => `<div data-s="${n}" ${n < 4 ? `data-until="${n + 1}"` : ''}><span class="dot">${n - 1}</span>${esc(HIGHLIGHT[n].text)}</div>`).join('')}</div>
+    ${title('Не «скормили LLM»: конвейер', 'конвейер')}
     <div class="body">
       ${arch()}
+      <div class="flags">${FLAGS.map((f, i) => `<span class="flag custom" data-s="${i + 2}" style="--k:${i}"><i></i>${esc(f)}</span>`).join('')}</div>
       <div class="tokens" aria-hidden="true"></div>
-      <div class="score-badge" style="left:${POS.score[0] - hw}px;top:${POS.score[1] - hh - 52}px"><span class="mono">${esc(NA.dialog)}</span><em class="mono">${num(NA.total, 2)}</em></div>
+      <div class="score-badge" style="left:${L('score')}px;top:${B('score') + 14}px"><span class="mono">${esc(WE.left.dialog)}</span><em class="mono">${num(WE.left.total, 2)}</em></div>
     </div>`,
   notes:
-    'Два судьи разных вендоров оценивают диалог независимо. Арбитр подключается только там, где они разошлись, поэтому это дешевле. Итоговые баллы считает код, а новый критерий из чек-листа сразу попадает в промпт, без программиста.',
+    'Архитектура. Мы не просто кормим LLM и просим оценить. Каждый диалог проходит через фильтрацию кодом, ставим флаги: кто ответил первым, паузы больше 180 секунд, формальное или неформальное приветствие, эскалация, подтверждение личности. Не просто слова, а соотношение слов и фактов двигает веса.',
   leave(el) {
     clearTokens(el)
     el.querySelector('.score-badge')?.classList.remove('on')
   },
   step(el, n, ctx) {
-    const svg = el.querySelector('.arch')!
-    const h = HIGHLIGHT[n]
-    svg.classList.toggle('focus', Boolean(h))
-    svg.querySelectorAll('.hl').forEach((item) => item.classList.remove('hl'))
-    if (h) {
-      h.nodes.forEach((id) => svg.querySelector(`[data-n="${id}"]`)?.classList.add('hl'))
-      h.edges.forEach((id) => {
-        svg.querySelector(`[data-e="${id}"]`)?.classList.add('hl')
-        svg.querySelector(`[data-el="${id}"]`)?.classList.add('hl')
-      })
-    }
+    el.querySelector('.node.big')?.classList.toggle('lit', n >= 2 && n < ARCH_STEPS)
     if (ctx.instant) {
       clearTokens(el)
-      showScore(el, true)
+      const layer = el.querySelector<HTMLElement>('.tokens')!
+      if (n < ARCH_STEPS) park(makeToken(layer, TOKEN_ID), 'signals')
+      else showScore(el, true)
+      if (n < ARCH_STEPS) el.querySelector('.score-badge')?.classList.remove('on')
       return
     }
-    if (n === 1) {
+    if (n === 1) void tokenIn(el)
+    else if (n < ARCH_STEPS) {
+      if (!el.querySelector('.token')) park(makeToken(el.querySelector<HTMLElement>('.tokens')!, TOKEN_ID), 'signals')
       el.querySelector('.score-badge')?.classList.remove('on')
-      void wait(1300).then(() => runToken(el, false))
-    } else if (n === 2) {
-      el.querySelector('.score-badge')?.classList.remove('on')
-      void runToken(el, true)
-    } else {
-      clearTokens(el)
-      showScore(el, true)
-    }
+    } else void tokenOut(el)
   },
 }
 
-// ---------------------------------------------------------------- 6. Сложность критериев: гонка-сортировка
-const rulings = step('Официальные трактовки').what
-const factsGist = researchItem('facts').gist_ru
-const pick = (text: string, phrase: string) => {
-  if (!text.includes(phrase)) throw new Error('нет фразы в данных: ' + phrase)
-  return phrase
+// ---------------------------------------------------------------- 08–09. Примеры: скриншот и выноски
+type Box = [number, number, number, number] // x0 y0 x1 y1 в пикселях скриншота
+type Callout = { kind: 'no' | 'yes' | 'mid'; from: Box[]; to: Box[]; head: string; why: string; turns: string; h: number }
+type Shot = { img: string; w: number; h: number; dialog: string; total: number; callouts: Callout[] }
+const SHOT_W = 1600 // ширина скриншота на холсте 1920
+const PADB = 5 // отступ рамки выноски вокруг фразы, px скриншота
+const FRAME = { left: 40, pad: 12, bottom: 992 }
+const LABEL_X = FRAME.left + SHOT_W + FRAME.pad * 2 + 22
+function shotGeom(s: Shot) {
+  const k = SHOT_W / s.w
+  const hh = s.h * k
+  const top = FRAME.bottom - hh - FRAME.pad * 2
+  return { k, hh, top, imgX: FRAME.left + FRAME.pad, imgY: top + FRAME.pad }
 }
-// Причины трудности: только формулировки из journey.json и research.json
-const REASONS: Record<string, { text: string; src: string }> = {
-  c7: { text: pick(rulings, 'только прощание = Нет'), src: 'трактовка Freedom' },
-  c2: { text: pick(rulings, 'клиент сразу всё сказал = N/A'), src: 'трактовка Freedom' },
-  c4: { text: pick(factsGist, 'Хуже всего модели оценивают фактическую правильность'), src: 'GER-Eval' },
-}
-const ranked = [...bench.criteria_difficulty].sort((a, b) => b.accuracy_all_models - a.accuracy_all_models)
-const hardest = new Set(ranked.slice(-3).map((c) => c.id))
-
-function setOrder(el: HTMLElement, sorted: boolean): void {
-  el.querySelectorAll<HTMLElement>('.crow').forEach((row) => {
-    row.style.order = sorted ? String(ranked.findIndex((c) => c.id === row.dataset.c)) : String(Number(row.dataset.c!.slice(1)) - 1)
-  })
-}
-
-const sDiff: Slide = {
-  id: 'difficulty',
-  label: 'Где решается точность',
-  steps: 3,
-  cls: 's-diff',
-  html: () => `
-    ${title('Где решается точность', 'точность')}
-    <div class="body">
-      <div class="crows">
-        ${bench.criteria_difficulty
-          .map((c, i) => {
-            const r = REASONS[c.id]
-            return `<div class="crow${hardest.has(c.id) ? ' hard' : ''}" data-c="${c.id}" style="order:${i}">
-              <span class="code mono">${c.id}</span><span class="cname">${c.name}</span>
-              <span class="ctrack"><i class="cbar custom" data-s="1" style="--w:${c.accuracy_all_models / 100};transition-delay:${i * 60}ms"></i></span>
-              <span class="cval mono">${num(c.accuracy_all_models)}</span>
-              ${r ? `<span class="reason" data-s="3"><b>трудно</b><span>${esc(r.text)}<i class="mono">${esc(r.src)}</i></span></span>` : '<span></span>'}
-            </div>`
-          })
-          .join('')}
-      </div>
-      <div class="cap diff-cap">Совпадение с эталоном по критерию, все ${bench.models.length} моделей, %</div>
-    </div>`,
-  notes:
-    'Труднее всего моделям даются «Завершение», «Консультация» и «Потребность», около семидесяти процентов у всех моделей. Именно там помогли официальные трактовки Freedom и осторожность с фактами о продуктах.',
-  step(el, n, ctx) {
-    const rows = [...el.querySelectorAll<HTMLElement>('.crow')]
-    const want = n >= 2
-    const sorted = el.dataset.sorted === '1'
-    if (want === sorted) return
-    el.dataset.sorted = want ? '1' : ''
-    if (ctx.instant) setOrder(el, want)
-    else flip(rows, () => setOrder(el, want), { duration: T[3], easing: EASE_IO, stagger: 20 })
-  },
-  leave(el) {
-    el.dataset.sorted = ''
-    setOrder(el, false)
-  },
-}
-
-// ---------------------------------------------------------------- 7. Что подкрутили (шкала времени)
-const pilot = step('Пилот нашёл нестабильность')
-const fix = step('Исправление стабильности')
-const calib = step('Калибровка подсказок')
-const flags = step('Тише флаги, чище данные')
-const minutes = (t: string) => {
-  const [h, m] = t.slice(6).split(':').map(Number)
-  return h * 60 + m
-}
-const SPAN = 100
-type TL = { t: string; point: number; bad: boolean; metric: string; chip: [string, string]; h: string; p: string }
-const strike = (oldV: string, newV: string, cls: string) =>
-  `<span class="metric ${cls}"><span class="old">${oldV}</span><span class="new" data-odo="${newV}" data-from="${oldV.padStart(newV.length, '0').slice(-newV.length)}">${newV}</span></span>`
-const TLS: TL[] = [
-  { t: pilot.t, point: 0, bad: true, metric: strike(num(pilot.metric!.before!, 2), num(pilot.metric!.after!, 2), 'bad'), chip: ['bad', 'сбой'], h: 'Повтор дал другой итог', p: 'p1-en-006: одна ступень «Ведения диалога», арбитр выбирал по-разному.' },
-  { t: fix.t, point: 1, bad: false, metric: '<span class="metric small good" data-sweep>нет сбоя, нет снижения</span>', chip: ['good', 'правило'], h: 'Снижение только с номером реплики', p: 'Кеш результата и сравнение при пересчёте: повтор даёт ту же оценку.' },
-  { t: calib.t, point: 2, bad: true, metric: `<span class="metric bad"><span class="new" data-odo="${num(calib.metric!.v4_mae!, 2)}">${num(calib.metric!.v4_mae!, 2)}</span></span>`, chip: ['bad', 'не прошла'], h: 'Версия 4: ошибка итога выше порога', p: 'Подсказки этой версии в работу не пошли.' },
-  { t: calib.t, point: 2, bad: false, metric: `<span class="metric good"><span class="new" data-odo="${num(calib.metric!.v5_accuracy!, 2)}%">${num(calib.metric!.v5_accuracy!, 2)}%</span></span>`, chip: ['good', 'прошла'], h: 'Версия 5: три правила для «Консультации»', p: `Ошибка итога ${num(calib.metric!.v5_mae!, 2)}.` },
-  { t: flags.t, point: 3, bad: false, metric: strike(String(flags.metric!.review_before), String(flags.metric!.review_after), 'good'), chip: ['good', 'тише'], h: 'Флаг «На проверку» только при реальном споре', p: `Из ${facts.headline.dialogs_dev} диалогов DEV.` },
-]
-const POINTS = [
-  { t: pilot.t, n: 'Пилот' },
-  { t: fix.t, n: 'Правило и кеш' },
-  { t: calib.t, n: 'Версии 4 и 5' },
-  { t: flags.t, n: 'Флаги' },
-]
-const pos = (t: string) => `calc(64px + (100% - 128px) * ${minutes(t) / SPAN})`
-
-const sJourney: Slide = {
-  id: 'journey',
-  label: 'Что мы подкрутили',
-  steps: TLS.length,
-  cls: 's-journey',
-  html: () => {
-    const ticks = Array.from({ length: SPAN / 5 + 1 }, (_, i) => i * 5)
-      .map((m) => `<i class="tk${m % 30 === 0 ? ' big' : ''}" style="left:calc(64px + (100% - 128px) * ${m / SPAN})"></i>${m % 30 === 0 ? `<span class="tl" style="left:calc(64px + (100% - 128px) * ${m / SPAN})">${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}</span>` : ''}`)
-      .join('')
-    return `
-    ${title('Что мы подкрутили', 'подкрутили')}
-    <div class="body">
-      <div class="panel-area">${TLS.map(
-        (item, i) => `<div class="tl-panel" data-s="${i + 1}" ${i < TLS.length - 1 ? `data-until="${i + 2}"` : ''}>
-          <div class="mwrap">${item.metric}</div>
-          <div class="txt"><span class="chip ${item.chip[0]}">${item.chip[1]}</span><h3>${esc(item.h)}</h3><p>${esc(item.p)}</p></div>
-        </div>`,
-      ).join('')}</div>
-      <div class="ruler">
-        <span class="day mono">${pilot.t.slice(0, 5)}, ночь</span>
-        <div class="track"><div class="fill"></div></div>
-        ${ticks}
-        ${POINTS.map((p, k) => `<div class="pt" data-k="${k}" style="left:${pos(p.t)}"><div class="t">${p.t.slice(6)}</div><div class="dot"></div><div class="n">${esc(p.n)}</div></div>`).join('')}
-        <div class="knob"></div>
-      </div>
-    </div>`
-  },
-  notes:
-    'Пилот показал, что повтор даёт другой итог: 85 и 80,5. Мы добавили кеш и правило: нет сбоя, нет снижения. Четвёртая версия подсказок не прошла порог, пятая дала 98,85 процента, а флагов на проверку стало 1 вместо 28.',
-  step(el, n) {
-    const cur = TLS[n - 1]
-    const knob = el.querySelector<HTMLElement>('.knob')!
-    knob.style.left = pos(cur.t)
-    knob.classList.toggle('bad', cur.bad)
-    el.querySelector<HTMLElement>('.fill')!.style.transform = `scaleX(${minutes(cur.t) / SPAN})`
-    el.querySelectorAll<HTMLElement>('.ruler .pt').forEach((pt) => {
-      const k = Number(pt.dataset.k)
-      pt.classList.toggle('done', k <= cur.point)
-      pt.classList.toggle('cur', k === cur.point)
-      const last = TLS.filter((item, i) => i < n && item.point === k).pop()
-      pt.classList.toggle('bad', Boolean(last?.bad))
-    })
-  },
-}
-
-// ---------------------------------------------------------------- 8. Демо
-// Фокус: доля ширины и высоты кадра; курсор едет к точке клика
-const DEMO = [
-  { text: 'Грубые нарушения', img: demoGross, url: '/gross', focus: [0.62, 0.16, 0.365, 0.32], click: [0.675, 0.452] },
-  { text: 'Карточка <span class="mono">p1-ru-009</span>', img: demoChat, url: '/dialogs/p1-ru-009', focus: [0.585, 0.295, 0.395, 0.27], click: [0.926, 0.43] },
-  { text: 'Апелляция', img: demoChat, url: '/dialogs/p1-ru-009', focus: [0.612, 0.085, 0.137, 0.048], click: [0.68, 0.108] },
-  { text: 'Новый критерий и вес', img: demoChecklists, url: '/checklists', focus: [0.212, 0.13, 0.538, 0.505], click: [0.68, 0.615] },
-  { text: 'Карта диалогов', img: demoMap, url: '/analytics', focus: [0.598, 0.35, 0.385, 0.52], click: [0.965, 0.453] },
-]
-const sDemo: Slide = {
-  id: 'demo',
-  label: 'Демо',
-  steps: DEMO.length,
-  dark: true,
-  cls: 's-demo',
-  html: () => `
-    <h2 class="title">Демо</h2>
-    <ol class="demo-list">${DEMO.map((item, i) => `<li data-s="${i + 1}"><span class="i">${i + 1}</span><span>${item.text}</span></li>`).join('')}</ol>
-    <div class="window">
-      <div class="wbar"><span class="mono url">localhost:8000<b>${DEMO[0].url}</b></span></div>
-      <div class="wview">
-        ${DEMO.map((d, i) => `<div class="shot" data-k="${i}"><img src="${d.img}" alt=""><svg class="focus" viewBox="0 0 1000 625" preserveAspectRatio="none"><rect x="${d.focus[0] * 1000}" y="${d.focus[1] * 625}" width="${d.focus[2] * 1000}" height="${d.focus[3] * 625}" rx="10" pathLength="1"/></svg></div>`).join('')}
-        <svg class="cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6 1.6L10 19z" fill="#1c1f1d" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
-      </div>
-    </div>`,
-  notes: 'Переключаемся в приложение. Идём по порядку на экране, сверху вниз.',
-  step(el, n, ctx) {
-    const d = DEMO[n - 1]
-    el.querySelector<HTMLElement>('.url b')!.textContent = d.url
-    el.querySelectorAll<HTMLElement>('.demo-list li').forEach((li, i) => li.classList.toggle('cur', i === n - 1))
-    const shots = [...el.querySelectorAll<HTMLElement>('.shot')]
-    shots.forEach((s, i) => s.classList.toggle('show', i === n - 1))
-    const shot = shots[n - 1]
-    const img = shot.querySelector('img')!
-    const rect = shot.querySelector<SVGRectElement>('.focus rect')!
-    const cursor = el.querySelector<SVGElement>('.cursor')!
-    const view = el.querySelector<HTMLElement>('.wview')!
-    const cx = d.click[0] * view.offsetWidth
-    const cy = d.click[1] * view.offsetHeight
-    img.style.transformOrigin = `${(d.focus[0] + d.focus[2] / 2) * 100}% ${(d.focus[1] + d.focus[3] / 2) * 100}%`
-    img.getAnimations().forEach((a) => a.cancel())
-    if (ctx.instant) {
-      cursor.style.transform = `translate(${cx}px, ${cy}px)`
-      rect.style.strokeDashoffset = '0'
-      img.style.transform = 'scale(1.03)'
-      return
-    }
-    img.style.transform = ''
-    img.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }], { duration: 5000, easing: 'linear', fill: 'forwards' })
-    rect.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: T[3], delay: 350, easing: EASE_IO, fill: 'both' })
-    const from = cursor.style.transform || `translate(${view.offsetWidth * 0.5}px, ${view.offsetHeight * 0.9}px)`
-    cursor.style.transform = `translate(${cx}px, ${cy}px)`
-    cursor.animate([{ transform: from }, { transform: `translate(${cx}px, ${cy}px)` }], { duration: T[3] + 200, delay: 200, easing: EASE_IO, fill: 'backwards' })
-  },
-}
-
-// ---------------------------------------------------------------- 9. Результат и роза весов N/A
-const H = facts.headline
-const holdout = H.holdout_note.match(/(\d+) из (\d+)/)!
-const hitN = Number(holdout[1])
-const allN = Number(holdout[2])
-
-type Sector = { name: string; w: number; answer: string; earned: number }
-const SECTORS: Sector[] = (Object.keys(NA.weights) as (keyof typeof NA.weights)[]).map((name) => {
-  const answer = NA.answers[name]
-  const w = NA.weights[name]
-  const earned = answer === 'Да' ? w : answer === 'Нет' || answer === 'N/A' ? 0 : w * (Number(answer.split(' из ')[0]) / Number(answer.split(' из ')[1]))
-  return { name, w, answer, earned }
-})
-
-const RC = 290 // центр розы
-const RR = 230 // радиус
-function sectorPath(a0: number, a1: number, r: number): string {
-  if (a1 - a0 < 0.0005) return ''
-  const p = (a: number, rr: number) => `${(RC + Math.sin(a) * rr).toFixed(2)} ${(RC - Math.cos(a) * rr).toFixed(2)}`
-  const large = a1 - a0 > Math.PI ? 1 : 0
-  return `M${RC} ${RC} L${p(a0, r)} A${r} ${r} 0 ${large} 1 ${p(a1, r)} Z`
-}
-/** t = 0: веса из 100, t = 1: N/A исключены, остальные делят 360°. */
-function roseFrame(svg: SVGSVGElement, t: number, grow = 1): void {
-  const total = SECTORS.reduce((s, x) => s + (x.answer === 'N/A' ? x.w * (1 - t) : x.w), 0)
-  let a = 0
-  const gap = 0.012
-  SECTORS.forEach((s, i) => {
-    const w = s.answer === 'N/A' ? s.w * (1 - t) : s.w
-    const span = (w / total) * Math.PI * 2
-    const a0 = a + gap / 2
-    const a1 = a + span - gap / 2
-    const g = svg.querySelector<SVGGElement>(`[data-sec="${i}"]`)!
-    const base = g.querySelector<SVGPathElement>('.sb')!
-    const fill = g.querySelector<SVGPathElement>('.sf')!
-    base.setAttribute('d', sectorPath(a0, a1, RR * grow))
-    fill.setAttribute('d', sectorPath(a0, a1, RR * grow * (s.w ? s.earned / s.w : 0)))
-    const mid = a + span / 2
-    const lab = g.querySelector<SVGTextElement>('text')!
-    lab.setAttribute('x', (RC + Math.sin(mid) * (RR + 34)).toFixed(1))
-    lab.setAttribute('y', (RC - Math.cos(mid) * (RR + 34) + 6).toFixed(1))
-    lab.setAttribute('text-anchor', Math.abs(Math.sin(mid)) < 0.2 ? 'middle' : Math.sin(mid) > 0 ? 'start' : 'end')
-    lab.style.opacity = String(s.answer === 'N/A' ? Math.max(0, 1 - t * 2) : 1)
-    a += span
-  })
-}
-function tween(ms: number, fn: (t: number) => void): Promise<void> {
-  return new Promise((resolve) => {
-    const start = performance.now()
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / ms)
-      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 // ease-in-out cubic
-      fn(e)
-      if (t < 1) requestAnimationFrame(tick)
-      else resolve()
-    }
-    requestAnimationFrame(tick)
-  })
-}
-let roseRun = 0
-async function playRose(el: HTMLElement, instant: boolean): Promise<void> {
-  roseRun += 1
-  const run = roseRun
-  const svg = el.querySelector<SVGSVGElement>('.rose')!
-  const total = el.querySelector<HTMLElement>('.rose-total')!
-  const note = el.querySelector<HTMLElement>('.rose-note')!
-  if (instant) {
-    roseFrame(svg, 1)
-    svg.classList.add('na-done')
-    total.textContent = num(NA.total, 2)
-    note.classList.add('on')
-    return
+/** Подписи справа от скриншота: по высоте своей строки критерия, без наложений. */
+function labelTops(s: Shot): number[] {
+  const g = shotGeom(s)
+  const want = s.callouts.map((c) => Math.min(...c.to.map((b) => g.imgY + ((b[1] + b[3]) / 2) * g.k)) - 22)
+  const order = want.map((_, i) => i).sort((a, b) => want[a] - want[b])
+  const tops: number[] = []
+  let floor = 128
+  for (const i of order) {
+    tops[i] = Math.max(want[i], floor)
+    floor = tops[i] + s.callouts[i].h + 14
   }
-  svg.classList.remove('na-done')
-  note.classList.remove('on')
-  total.textContent = fmt(NA.if_na_were_zero, 2)
-  roseFrame(svg, 0, 0)
-  await tween(T[4], (t) => roseFrame(svg, 0, t))
-  if (run !== roseRun) return
-  svg.classList.add('na-grey')
-  await wait(500)
-  if (run !== roseRun) return
-  svg.classList.add('na-done')
-  void odometer(total, num(NA.total, 2), { from: fmt(NA.if_na_were_zero, 2), duration: T[4] + 200 })
-  await tween(T[4] + 200, (t) => roseFrame(svg, t))
-  note.classList.add('on')
+  return tops
 }
-
-function roseSvg(): string {
-  const secs = SECTORS.map(
-    (s, i) => `<g data-sec="${i}" class="sec ${s.answer === 'N/A' ? 'na' : s.answer === 'Нет' ? 'no' : 'yes'}"><path class="sb"/><path class="sf"/><text>${esc(s.name)} <tspan class="num">${s.w}</tspan></text></g>`,
-  ).join('')
-  return `<svg class="rose" viewBox="-60 -20 700 620" role="img" aria-label="Веса критериев диалога ${NA.dialog}: N/A исключены, итог ${num(NA.total, 2)}">
-    <circle cx="${RC}" cy="${RC}" r="${RR}" class="rose-ring"/>${secs}<circle cx="${RC}" cy="${RC}" r="122" class="rose-hole"/></svg>`
-}
-
-const sResult: Slide = {
-  id: 'result',
-  label: 'Результат на новых данных',
-  steps: 5,
-  chapter: '04 Результат',
-  cls: 's-result',
-  html: () => {
-    const oursW = (H.usd_per_dialog / opusModel.usd_per_dialog) * 100
-    return `
-    ${title('Результат на новых данных', 'новых')}
-    <div class="body">
-      <div class="hero-grid">
-        <div class="card hc" data-s="1"><div class="hl">точность на 10 новых чатах</div><div class="hv" data-odo="${num(H.holdout_accuracy_pct)}%">${num(H.holdout_accuracy_pct)}%</div>
-          <div class="waffle">${Array.from({ length: allN }, (_, i) => `<i class="${i >= hitN ? 'no' : ''}" style="--i:${i}"></i>`).join('')}</div>
-          <div class="hn">${hitN} из ${allN} ответов, эталон до прогона</div></div>
-        <div class="card hc" data-s="2"><div class="hl">ошибка итога на них же</div><div class="hv" data-odo="${num(H.holdout_mae_points, 2)}">${num(H.holdout_mae_points, 2)}</div>
-          <div class="scale"><i style="left:${H.holdout_mae_points * 10}%"></i><span>0</span><span>10 баллов</span></div>
-          <div class="hn">средняя разница с эталоном, из 100</div></div>
-        <div class="card hc" data-s="3"><div class="hl">стабильность повтора</div><div class="hv" data-odo="${short(H.stability_pct).replace(',0', '')}%">${H.stability_pct}%</div>
-          <div class="meter"><i style="--w:${H.stability_pct / 100}"></i></div>
-          <div class="hn">повтор даёт тот же ответ</div></div>
-        <div class="card hc" data-s="4"><div class="hl">цена за диалог</div><div class="hv" data-odo="${usd(H.usd_per_dialog)}">${usd(H.usd_per_dialog)}</div>
-          <div class="cmp"><span>наш ансамбль</span><span class="bt"><i class="b" style="--w:${oursW / 100}"></i></span>
-          <span>${modelName(opusModel.model)}</span><span class="bt"><i class="b other" style="--w:1"></i></span></div>
-          <div class="hn">${modelName(opusModel.model)}: ${usd(opusModel.usd_per_dialog)}</div></div>
-      </div>
-      <div class="rose-wrap custom" data-s="5">
-        <div class="rose-head"><b>Почему N/A не ноль</b><span class="chip src-chip">${esc(NA.dialog)}</span></div>
-        ${roseSvg()}
-        <div class="rose-center"><div class="rose-total">${num(NA.total, 2)}</div><div class="rose-sub">итог</div></div>
-        <div class="rose-note"><s class="mono">${short(NA.if_na_were_zero)}</s> если считать N/A нулём. Вес ${SECTORS.filter((s) => s.answer === 'N/A').map((s) => `«${s.name}»`).join(' и ')} делят остальные</div>
-      </div>
-      <div class="facts-row" data-s="5" style="transition-delay:.2s">
-        <div><b>${H.dialogs_dev}</b> диалогов DEV</div>
-        <div><b>${H.languages.join(' ')}</b></div>
-        <div><b>${H.tests_backend}</b> тестов</div>
-      </div>
-    </div>`
-  },
-  notes:
-    'На десяти новых чатах 97,2 процента, эталон зафиксировали до прогона; честно, чаты писали мы сами. Повтор совпадает на 99 процентов, диалог стоит два цента. И главное: N/A не ноль, вес делят остальные критерии, поэтому 92,31, а не 60.',
-  step(el, n, ctx) {
-    if (n === 5) void playRose(el, ctx.instant)
-    else roseRun += 1
-  },
-  leave() {
-    roseRun += 1
-  },
-}
-
-// ---------------------------------------------------------------- 10. Что сделали сами: плитки-перевёртыши
-const OURS = [
-  { i: 0, icon: 'bench', text: 'Свой бенчмарк на 16 моделях' },
-  { i: 1, icon: 'judges', text: 'Два судьи и арбитр' },
-  { i: 2, icon: 'checklist', text: 'Новый критерий без кода' },
-  { i: 3, icon: 'shield', text: 'Нет сбоя, нет снижения' },
-  { i: 5, icon: 'lock', text: 'Эталон размечен до прогона' },
-  { i: 7, icon: 'wave', text: 'Звонки: маски и локальный Whisper' },
-]
-export const oursCaptions = OURS
-
-const sOurs: Slide = {
-  id: 'ours',
-  label: 'Что сделали сами',
-  steps: OURS.length,
-  chapter: '05 Что сделали сами',
-  cls: 's-ours',
-  html: () => `
-    ${title('Что сделали сами', 'сами')}
-    <div class="body"><div class="ours">${OURS.map(
-      (item, k) => `<div class="flip custom" data-s="${k + 1}"><div class="fi">
-        <div class="ff"><div class="ic">${icons[item.icon]}</div><p>${esc(item.text)}</p></div>
-        <div class="fb"><div class="ic sm">${icons[item.icon]}</div><b>${esc(item.text)}</b><span>${esc(facts.ours[item.i])}</span></div>
-      </div></div>`,
-    ).join('')}</div></div>`,
-  notes:
-    'Отличие от «просто GPT с чек-листом» в инженерии вокруг модели: свой бенчмарк, два судьи и арбитр, правило против случайных снижений, честная контрольная выборка и звонки с масками данных.',
-  enter(el, ctx) {
-    if (ctx.instant) return
-    el.querySelectorAll<SVGGeometryElement>('.ff .ic svg path, .ff .ic svg rect, .ff .ic svg circle').forEach((p, i) => {
-      if (p.getAttribute('stroke') === 'none') return
-      drawPath(p, T[3], 200 + i * 25)
+function shotHtml(s: Shot, step0: number): string {
+  const g = shotGeom(s)
+  const tops = labelTops(s)
+  const boxes = s.callouts
+    .map((c, i) => {
+      const st = step0 + i
+      const rect = (b: Box, cls: string, d: number) =>
+        `<rect class="cb ${cls} ${c.kind} draw" data-s="${st}" pathLength="1" style="transition-delay:${d}ms" x="${b[0] - PADB}" y="${b[1] - PADB}" width="${b[2] - b[0] + PADB * 2}" height="${b[3] - b[1] + PADB * 2}" rx="7"/>`
+      const src = c.from[c.from.length - 1]
+      const links = c.to
+        .map((b, j) => {
+          const x0 = src[2] + PADB
+          const y0 = (src[1] + src[3]) / 2
+          const x1 = b[0] - PADB
+          const y1 = (b[1] + b[3]) / 2
+          const dx = (x1 - x0) * 0.45
+          return `<path class="cl ${c.kind} draw" data-s="${st}" pathLength="1" style="transition-delay:${260 + j * 120}ms" d="M${x0} ${y0} C${x0 + dx} ${y0} ${x1 - dx} ${y1} ${x1} ${y1}"/>`
+        })
+        .join('')
+      return c.from.map((b, j) => rect(b, j < c.from.length - 1 ? 'pre' : '', j * 90)).join('') + links + c.to.map((b, j) => rect(b, 'row', 480 + j * 120)).join('')
     })
-  },
+    .join('')
+  const leaders = s.callouts
+    .map((c, i) =>
+      c.to
+        .map((b, j) => {
+          const x0 = g.imgX + (b[2] + PADB) * g.k
+          const y0 = g.imgY + ((b[1] + b[3]) / 2) * g.k
+          const ly = tops[i] + 22
+          const xm = LABEL_X - 12
+          return `<path class="lead ${c.kind} draw" data-s="${step0 + i}" pathLength="1" style="transition-delay:${640 + j * 100}ms" d="${rounded([[x0, y0], [xm, y0], [xm, ly], [LABEL_X - 2, ly]], 6)}"/>`
+        })
+        .join(''),
+    )
+    .join('')
+  const labels = s.callouts
+    .map(
+      (c, i) => `<div class="clab ${c.kind}" data-s="${step0 + i}" style="top:${tops[i]}px;left:${LABEL_X}px;transition-delay:760ms">
+      <b>${esc(c.head)}</b><span>${esc(c.why)}</span><i class="mono">${esc(c.turns)}</i></div>`,
+    )
+    .join('')
+  return `
+    <div class="shot-win" style="left:${FRAME.left}px;top:${g.top}px;width:${SHOT_W + FRAME.pad * 2}px">
+      <div class="shot-zoom">
+        <img src="${s.img}" width="${SHOT_W}" height="${g.hh.toFixed(1)}" alt="Карточка диалога ${esc(s.dialog)} в приложении: транскрипт и оценки по критериям">
+        <svg class="callouts-svg" viewBox="0 0 ${s.w} ${s.h}" preserveAspectRatio="none" aria-hidden="true">${boxes}</svg>
+      </div>
+    </div>
+    <svg class="leaders-svg" viewBox="0 0 1920 1080" aria-hidden="true">${leaders}</svg>
+    ${labels}`
+}
+function kenBurns(el: HTMLElement, ctx: Ctx): void {
+  const z = el.querySelector<HTMLElement>('.shot-zoom')
+  if (!z || ctx.instant || still()) return
+  z.animate([{ transform: 'scale(1.03)' }, { transform: 'none' }], { duration: 4200, easing: EASE_OUT })
 }
 
-// ---------------------------------------------------------------- 11. Что дальше
+// Координаты фраз и строк критериев измерены по пикселям docs/screens/2x/14-chat-ru-014-words.png (1810×912)
+const ROW014 = (cy: number): Box => [1008, cy - 19, 1786, cy + 19]
+const SHOT014: Shot = {
+  img: shot014,
+  w: 1810,
+  h: 912,
+  dialog: WE.left.dialog,
+  total: WE.left.total,
+  callouts: [
+    { kind: 'no', from: [[273, 664, 491, 680]], to: [ROW014(154)], head: 'Контакт: Нет', why: '«Привет», имени нет; флаг неформального приветствия', turns: '#10', h: 116 },
+    { kind: 'no', from: [[273, 434, 779, 450], [273, 664, 491, 680]], to: [ROW014(201), [1008, 487, 1786, 547]], head: 'Потребность: Нет, Ведение: 7', why: 'переспросил то, что клиент уже сказал', turns: '#5 → #10', h: 116 },
+    { kind: 'no', from: [[272, 710, 369, 726], [273, 756, 324, 772]], to: [ROW014(457)], head: 'Эмпатия: Нет', why: '«Понял» в ответ на «Я уже писал»', turns: '#11 → #12', h: 116 },
+    { kind: 'no', from: [[272, 873, 387, 889]], to: [ROW014(576)], head: 'Завершение: Нет', why: '«Хорошего дня» без итога', turns: '#14', h: 92 },
+  ],
+}
+// docs/screens/2x/15-chat-ru-015-words.png (1905×990)
+const ROW015 = (cy: number, h = 19): Box => [1110, cy - h, 1886, cy + h]
+const SHOT015: Shot = {
+  img: shot015,
+  w: 1905,
+  h: 990,
+  dialog: WE.right.dialog,
+  total: WE.right.total,
+  callouts: [
+    { kind: 'yes', from: [[373, 776, 623, 794]], to: [ROW015(231)], head: 'Контакт: Да', why: '«Здравствуйте, меня зовут Дина»', turns: '#10', h: 92 },
+    { kind: 'yes', from: [[772, 893, 983, 909], [373, 918, 449, 932]], to: [ROW015(653)], head: 'Завершение: Да', why: 'благодарность и прощание', turns: '#12', h: 92 },
+    { kind: 'mid', from: [[372, 847, 712, 861], [372, 893, 761, 909]], to: [ROW015(430, 30)], head: 'Консультация: 15 из 20', why: 'на «ждать не надо?» нет прямого ответа', turns: '#11 → #12', h: 116 },
+  ],
+}
+const diff = Math.round(WE.right.total - WE.left.total)
+
+const sRu014: Slide = {
+  id: 'ru-014',
+  label: 'Пример ru-014: 38,13',
+  steps: SHOT014.callouts.length,
+  chapter: '04 Примеры',
+  cls: 's-shot',
+  html: () => `
+    <div class="shot-head">${title('Пример ru-014', 'ru-014')}<span class="shot-sub">поддержка решила вопрос клиента</span></div>
+    <div class="shot-hero no" data-s="${SHOT014.callouts.length}" style="transition-delay:1s"><b data-odo="${num(SHOT014.total, 2)}">${num(SHOT014.total, 2)}</b><span>из 100</span></div>
+    ${shotHtml(SHOT014, 1)}`,
+  notes:
+    'Пример ru-014. Поддержка решила вопрос клиента, оценка 38,13. «Привет» вместо «Здравствуйте, меня зовут» снимает контакт. Повторный вопрос о том, что клиент уже сказал боту, снимает потребность и ступень ведения диалога. «Понял» в ответ на «я уже писал» снимает эмпатию. «Хорошего дня» без итога снимает завершение.',
+  enter: kenBurns,
+}
+
+const sRu015: Slide = {
+  id: 'ru-015',
+  label: 'Пример ru-015: 92,31',
+  steps: SHOT015.callouts.length + 1,
+  cls: 's-shot',
+  html: () => `
+    <div class="shot-head">${title('Пример ru-015', 'ru-015')}<span class="shot-sub">тот же тип вопроса</span></div>
+    <div class="shot-hero yes">
+      <div class="cmp-old" data-s="${SHOT015.callouts.length + 1}"><b data-odo="${num(WE.left.total, 2)}">${num(WE.left.total, 2)}</b><span>${esc(WE.left.dialog)}</span></div>
+      <div class="cmp-new" data-s="${SHOT015.callouts.length}" style="transition-delay:1s"><b data-odo="${num(SHOT015.total, 2)}">${num(SHOT015.total, 2)}</b><span>${esc(WE.right.dialog)}</span></div>
+      <p class="cmp-cap" data-s="${SHOT015.callouts.length + 1}" style="transition-delay:.4s">разница <span class="mono">${diff}</span> балла, каждое снижение со ссылкой на реплику</p>
+    </div>
+    ${shotHtml(SHOT015, 1)}`,
+  notes:
+    'Пример ru-015. Тот же тип вопроса, оценка 92,31. «Здравствуйте, меня зовут Дина», вопрос закрыт, прощание с благодарностью. Снята одна ступень консультации: на уточнение «ждать не надо?» оператор не ответил прямо. Каждое снижение со ссылкой на номер реплики.',
+  enter: kenBurns,
+}
+
+// ---------------------------------------------------------------- 10. Два судьи и арбитр → демо
+const holdout = H.holdout_note.match(/(\d+) из (\d+)/)!
+const pointsTotal = TR.judge_agreement.split(' из ')[1]
+const ROLES = [
+  { m: judgeA, role: ROLE.judge_A, chip: 'good', vendor: 'Google', stats: [['KZ', `${judgeA.kz}%`]] },
+  { m: judgeB, role: ROLE.judge_B, chip: 'good', vendor: 'OpenAI', stats: [['EN', `${judgeB.en}%`], ['грубые', judgeB.gross_found]] },
+  { m: arbiter, role: ROLE.arbiter, chip: 'warn', vendor: 'только спорные критерии', stats: [['на контроле', `${TR.arbitrated} из ${pointsTotal}`]] },
+]
 function qrSvg(): string {
   const n = qr.size
   let cells = ''
@@ -1062,103 +914,44 @@ function qrSvg(): string {
     for (let c = 0; c < n; c += 1) if (qr.bits[r * n + c] === '1') cells += `<rect x="${c}" y="${r}" width="1.04" height="1.04" style="--d:${r + c}"/>`
   return `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR: ${REPO_URL}">${cells}</svg>`
 }
-
-const sNext: Slide = {
-  id: 'next',
-  label: 'Что дальше',
-  steps: 4,
-  dark: true,
-  cls: 's-next',
+const RESULT = [
+  { v: `${num(H.holdout_accuracy_pct)}%`, l: 'точность на 10 новых чатах', n: `${holdout[1]} из ${holdout[2]}` },
+  { v: num(H.holdout_mae_points, 2), l: 'ошибка итога', n: 'баллов из 100' },
+  { v: `${short(H.stability_pct).replace(/,0$/, '')}%`, l: 'стабильность повтора', n: `${TR.stability}` },
+  { v: usd(H.usd_per_dialog), l: 'за диалог', n: 'два судьи и арбитр' },
+]
+const sJudges: Slide = {
+  id: 'judges',
+  label: 'Два судьи и арбитр → демо',
+  steps: 3,
+  cls: 's-judges',
   html: () => `
-    ${title('Что дальше', 'дальше')}
-    <div class="next">
-      <div class="mask" data-s="1"><span class="ic">${icons.book}</span><div><b>Справочник продуктов Freedom</b><span>чтобы «Консультация» проверяла факты, а не только логику</span></div></div>
-      <div class="mask" data-s="2"><span class="ic">${icons.tracks}</span><div><b>ASR и диаризация для звонков</b><span>две настоящие дорожки вместо восстановленных по транскрипту</span></div></div>
-      <div class="mask" data-s="3"><span class="ic">${icons.crm}</span><div><b>Компонент Dynamics 365</b><span>оценка прямо в карточке обращения</span></div></div>
-    </div>
-    <div class="qr custom" data-s="4"><div class="tile">${qrSvg()}</div><div class="url">${REPO_URL.replace('https://', '')}</div></div>
-    <div class="thanks" data-s="4" style="transition-delay:.4s">Спасибо</div>
-    ${marquee()}`,
+    ${title('Два судьи и арбитр', 'арбитр')}
+    <div class="body">
+      <div class="jcards">${ROLES.map(
+        (r, i) => `<div class="card jcard${r.m.chosen === 'arbiter' ? ' arb' : ''}" data-s="1" style="transition-delay:${i * 140}ms">
+          <div class="jtop"><span class="chip ${r.chip}">${esc(r.role)}</span><span class="jv">${esc(r.vendor)}</span></div>
+          <div class="jn">${modelName(r.m.model)}</div>
+          <dl>${r.stats.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd class="mono">${esc(v)}</dd></div>`).join('')}</dl>
+        </div>`,
+      ).join('')}</div>
+      <div class="jcode" data-s="2"><span class="chip src-chip">код</span>баллы считает код: N/A перераспределяет вес, округление half-up</div>
+      <div class="jnums">${RESULT.map(
+        (r, i) => `<div data-s="2" style="transition-delay:${200 + i * 120}ms"><span class="hl">${esc(r.l)}</span><b data-odo="${esc(r.v)}">${esc(r.v)}</b><i>${esc(r.n)}</i></div>`,
+      ).join('')}</div>
+      <a class="go-demo" data-s="3" href="${DEMO_URL}" target="_blank" rel="noopener">Живое демо</a>
+      <div class="qr4 custom" data-s="3"><div class="tile">${qrSvg()}</div><span class="mono">${REPO_URL.replace('https://', '')}</span></div>
+    </div>`,
   notes:
-    'Дальше: справочник продуктов Freedom, чтобы проверять факты в консультациях, распознавание и разделение дорожек для звонков и встраивание в Dynamics 365. Код открыт, QR на экране. Спасибо!',
-  enter(el) {
-    startMarquee(el)
-  },
+    'Ссылаясь на проверенную схему LLM-as-a-Judge: два судьи от разных вендоров, Gemini и GPT, строят мнения независимо, арбитр решает только спорные критерии, баллы считает код, а не модель. Дальше живое демо.',
 }
 
 // ---------------------------------------------------------------- Резерв
 const reserveTag = '<div class="reserve-tag"><span class="chip">резерв</span></div>'
 
-const rCall: Slide = {
-  id: 'r1-calls',
-  label: 'R1 Звонки',
-  steps: 2,
-  reserve: true,
-  cls: 'r-call',
-  html: () => `
-    ${reserveTag}
-    ${title('Звонки: две дорожки и маски')}
-    <div class="body">
-      <div class="card shot-r" data-s="1"><img src="${callUrl}" alt="Карточка звонка p4-ru-001: дорожки клиента и оператора, метрики речи, октагон"></div>
-      <div class="stack3">
-        <div data-s="2"><b>Две дорожки</b><span>запись одноканальная, дорожки построены по транскрипту</span></div>
-        <div data-s="2" style="transition-delay:.15s"><b>Метрики речи</b><span>темп, паузы, перебивания, доля речи по меткам времени</span></div>
-        <div data-s="2" style="transition-delay:.3s"><b>Маски данных</b><span>дубли ASR убраны, персональные данные скрыты, Whisper локально</span></div>
-      </div>
-    </div>`,
-  notes:
-    'Звонки: запись одноканальная, поэтому дорожки строим по транскрипту. Метрики речи считаем по меткам времени, персональные данные маскируем, Whisper работает локально.',
-}
-
-function localBars(): string {
-  const rows = bench.models.filter((m) => m.fits_8gb_laptop).sort((a, b) => b.accuracy - a.accuracy)
-  const leader = [...bench.models].sort((a, b) => b.accuracy - a.accuracy)[0]
-  const x0 = 260
-  const x1 = 940
-  const X = (v: number) => x0 + (v / 100) * (x1 - x0)
-  const rowH = 84
-  const body = rows
-    .map((m, i) => {
-      const y = 24 + i * rowH
-      const pick = m.chosen === 'local_mode'
-      return `<text x="${x0 - 24}" y="${y + 27}" text-anchor="end" font-size="23" fill="var(--text)" ${pick ? 'font-weight="700"' : 'font-weight="500"'}>${modelName(m.model)}</text>
-        <rect x="${x0}" y="${y}" width="${x1 - x0}" height="38" rx="19" fill="var(--bg-2)"/>
-        <rect x="${x0}" y="${y}" width="${X(m.accuracy) - x0}" height="38" rx="19" fill="${pick ? 'var(--accent)' : 'var(--neutral)'}"/>
-        <text class="num" x="${x1 + 20}" y="${y + 27}" font-size="22" font-weight="600" fill="var(--text)">${num(m.accuracy)}</text>`
-    })
-    .join('')
-  const h = 24 + rows.length * rowH
-  return `<svg viewBox="0 0 1060 ${h + 64}" style="width:100%;display:block;overflow:visible" role="img" aria-label="Точность локальных моделей">
-    ${body}
-    <line class="ref" x1="${X(leader.accuracy)}" x2="${X(leader.accuracy)}" y1="8" y2="${h}"/>
-    <text x="${X(leader.accuracy)}" y="${h + 32}" text-anchor="middle" font-size="19" font-weight="600" fill="var(--accent-dark)">облачный лидер <tspan class="num">${num(leader.accuracy)}</tspan></text>
-  </svg>`
-}
-
-const gemma = bench.models.find((m) => m.chosen === 'local_mode')!
-const rLocal: Slide = {
-  id: 'r2-local',
-  label: 'R2 Локальный режим',
-  steps: 2,
-  reserve: true,
-  cls: 'r-local',
-  html: () => `
-    ${reserveTag}
-    ${title('Локальный режим')}
-    <div class="body local">
-      <div data-s="1">${localBars()}<div class="cap">Модели, которые помещаются в ноутбук с 8 ГБ видеопамяти, точность на тех же 12 DEV-чатах, %</div></div>
-      <div class="stack3">
-        <div data-s="2"><b>${esc(facts.architecture.local_mode)}</b><span>Данные не покидают компьютер</span></div>
-        <div data-s="2" style="transition-delay:.15s"><b>Честная точность: <span class="mono">${num(gemma.accuracy)}%</span></b><span>Грубые нарушения: найдено ${gemma.gross_found.replace('/', ' из ')}, <span class="mono">${usd(gemma.usd_per_dialog)}</span> за диалог через OpenRouter</span></div>
-      </div>
-    </div>`,
-  notes:
-    'Локальный режим: тот же код, судья Gemma 4 26B-A4B через Ollama. Помещается в ноутбук с 8 ГБ видеопамяти, но точность 83,9 против 97,7 у облачного лидера, это честная цена приватности.',
-}
-
 const rTable: Slide = {
-  id: 'r3-table',
-  label: 'R3 Все 16 моделей',
+  id: 'r1-table',
+  label: 'R1 Все 16 моделей',
   steps: 2,
   reserve: true,
   cls: 'r-table',
@@ -1167,38 +960,96 @@ const rTable: Slide = {
     ${title(`Все ${bench.models.length} моделей`)}
     <div class="body" style="top:232px;bottom:104px" data-s="1">
       <table class="full">
-        <thead><tr><th>Модель</th><th class="n">Точность</th><th class="n">RU</th><th class="n">KZ</th><th class="n">EN</th><th class="n">Грубые</th><th class="n">Ошибка итога</th><th class="n">$ за диалог</th><th class="n">с на диалог</th><th class="n">Открытые веса</th><th>Роль</th></tr></thead>
+        <thead><tr><th>Модель</th><th class="n">Точность</th><th class="n">RU</th><th class="n">KZ</th><th class="n">EN</th><th class="n">Грубые</th><th class="n">Ошибка итога</th><th class="n">$ за диалог</th><th class="n">с на диалог</th><th class="n">8 ГБ</th><th>Роль</th></tr></thead>
         <tbody>${bench.models
           .map(
-            (m) => `<tr class="${m.chosen ? 'chosen' : ''}"><td>${modelName(m.model)}</td><td class="n">${num(m.accuracy)}</td><td class="n">${m.ru}</td><td class="n">${m.kz}</td><td class="n">${m.en}</td><td class="n">${m.gross_found}</td><td class="n">${num(m.mae_total, 2)}</td><td class="n">${short(m.usd_per_dialog)}</td><td class="n">${short(m.sec_per_dialog)}</td><td class="n">${m.open_weights ? 'да' : 'нет'}</td><td class="role">${m.chosen ? ROLE[m.chosen] : ''}</td></tr>`,
+            (m) => `<tr class="${m.chosen ? 'chosen' : ''}"><td>${modelName(m.model)}</td><td class="n">${num(m.accuracy)}</td><td class="n">${m.ru}</td><td class="n">${m.kz}</td><td class="n">${m.en}</td><td class="n">${m.gross_found}</td><td class="n">${num(m.mae_total, 2)}</td><td class="n">${short(m.usd_per_dialog)}</td><td class="n">${short(m.sec_per_dialog)}</td><td class="n">${m.fits_8gb_laptop ? 'да' : ''}</td><td class="role">${m.chosen ? ROLE[m.chosen] : ''}</td></tr>`,
           )
           .join('')}</tbody>
       </table>
     </div>`,
-  notes: 'Полная таблица бенчмарка: шестнадцать моделей, точность по языкам, найденные грубые нарушения, ошибка итога, цена и время.',
+  notes: 'Полная таблица бенчмарка: шестнадцать моделей на двенадцати размеченных чатах, точность по языкам, найденные грубые нарушения, ошибка итога, цена и время на диалог.',
 }
 
+const rCall: Slide = {
+  id: 'r2-call',
+  label: 'R2 Звонок и Whisper',
+  steps: 2,
+  reserve: true,
+  cls: 'r-call',
+  html: () => `
+    ${reserveTag}
+    ${title('Звонок и Whisper')}
+    <div class="body">
+      <div class="card shot-r" data-s="1"><img src="${callUrl}" alt="Карточка звонка p4-ru-001: расшифровка, плеер, оценка по чек-листу"></div>
+      <div class="stack3">
+        <div data-s="2"><b>Дубли ASR</b><span>повторы распознавания убираются при нормализации</span></div>
+        <div data-s="2" style="transition-delay:.15s"><b>Маски данных</b><span>персональные данные скрыты до оценки</span></div>
+        <div data-s="2" style="transition-delay:.3s"><b>Локальный Whisper</b><span>запись не уходит наружу</span></div>
+      </div>
+    </div>`,
+  notes: 'Звонки идут тем же конвейером. Нормализация убирает дубли распознавания, персональные данные маскируются, Whisper работает локально.',
+}
+
+const naRows = Object.entries(NA.answers as Record<string, string>)
+const rNA: Slide = {
+  id: 'r3-na',
+  label: 'R3 N/A на ru-020',
+  steps: 2,
+  reserve: true,
+  cls: 'r-na',
+  html: () => `
+    ${reserveTag}
+    ${title('N/A не равно нулю: ru-020')}
+    <div class="body">
+      <div class="card oct" data-s="1"><img src="${octagon020}" alt="Октагон качества диалога ${esc(NA.dialog)}: два критерия N/A"></div>
+      <div class="na4">
+        <div class="na-num" data-s="1"><s class="mono">${short(NA.if_na_were_zero)}</s><span>→</span><b data-odo="${num(NA.total, 2)}" data-from="${fmt(NA.if_na_were_zero, 2)}">${num(NA.total, 2)}</b></div>
+        <p data-s="1">если N/A считать нулём, было бы ${short(NA.if_na_were_zero)}; вес N/A делят остальные критерии</p>
+        <div class="na-rows" data-s="2">${naRows.map(([k, v]) => `<div class="${v === 'N/A' ? 'na' : v === 'Нет' ? 'no' : ''}"><span>${esc(k)}</span><span class="mono">${W[k]}</span><b>${esc(v)}</b></div>`).join('')}</div>
+        <p class="na-sum" data-s="2">применимо <b class="mono">${NA.applicable_weight}</b>, набрано <b class="mono">${NA.earned}</b>: ${NA.earned} / ${NA.applicable_weight} = <b class="mono">${num(NA.total, 2)}</b></p>
+      </div>
+    </div>`,
+  notes: 'Диалог ru-020: клиент сразу всё сказал, данных счёта не было, поэтому Потребность и Идентификация неприменимы. Применимый вес 65, набрано 60, итог 92,31. Если бы N/A считался нулём, было бы 60. Это официальная трактовка Freedom.',
+}
+
+const LIM = facts.limits as Record<string, string>
 const rLimits: Slide = {
   id: 'r4-limits',
   label: 'R4 Ограничения',
-  steps: 3,
+  steps: 4,
   reserve: true,
   cls: 'r-limits',
   html: () => `
     ${reserveTag}
-    ${title('Что пока не проверено')}
+    ${title('Ограничения, честно')}
     <div class="body">
-      <div class="limits">
-        <div data-s="1"><span class="chip warn">контроль</span><b style="margin-top:20px">Контрольные чаты наши</b><span>Эталон зафиксирован до прогона, но чаты писал автор системы, и они чище реальных</span></div>
-        <div data-s="2"><span class="chip warn">калибровка</span><b style="margin-top:20px">Цифра завышена</b><span><span class="mono">${num(H.calibration_accuracy_pct)}%</span> на 12 диалогах, на которых настраивались подсказки</span></div>
-        <div data-s="3"><span class="chip bad">не запускали</span><b style="margin-top:20px">Окружения</b><span>Docker, локальную модель и запуск на Linux</span></div>
+      <div class="limits four">
+        <div data-s="1"><span class="chip warn">эталон</span><b>Эталон наш, а не Freedom</b><span>размечен нашей командой по чек-листу и трактовкам Freedom до запуска модели</span></div>
+        <div data-s="2"><span class="chip warn">контроль</span><b>Контроль: ${TR.holdout_dialogs} чатов</b><span><span class="mono">${TR.confident_items}</span> уверенный пункт, <span class="mono">${TR.disputed_items}</span> спорных исключены</span></div>
+        <div data-s="3"><span class="chip bad">c2</span><b>Потребность: <span class="mono">${TR.c2_holdout_pct}%</span></b><span><span class="mono">${esc(TR.c2_holdout)}</span> на контроле: граница между «уточнил» и N/A</span></div>
+        <div data-s="4"><span class="chip warn">c7</span><b>Правило про прощание</b><span>Freedom: «${esc(LIM.closure_freedom_answer)}». Мы ${esc(LIM.closure_our_reading)}. От правила зависят <span class="mono">${esc(LIM.closure_rule_dependent)}</span> чатов</span></div>
       </div>
-      <p class="cap" data-s="3" style="position:absolute;left:0;bottom:0;margin:0;font-size:28px;color:var(--text)">Настоящей проверкой будет эталон организаторов.</p>
     </div>`,
-  notes:
-    'Что не проверено: Docker, локальная модель, запуск на Linux. Калибровочные 98,9 процента завышены, на них настраивались подсказки, а контрольные чаты писали мы сами.',
+  notes: 'Ограничения: эталон размечен нами, а не Freedom; контроль это десять чатов; Потребность на контроле 75 процентов. Правило про прощание: Freedom ответил «на ваше усмотрение», мы читаем чек-лист буквально, и от этого правила зависят 44 чата из 65.',
 }
 
-export const slides: Slide[] = [sTitle, sCover, sResearch, sTour, sArch, sDiff, sJourney, sDemo, sResult, sOurs, sNext, rCall, rLocal, rTable, rLimits]
+const rAppeals: Slide = {
+  id: 'r5-appeals',
+  label: 'R5 Апелляции и чек-лист',
+  steps: 2,
+  reserve: true,
+  cls: 'r-appeals',
+  html: () => `
+    ${reserveTag}
+    ${title('Апелляции и редактор чек-листа')}
+    <div class="body two-shots">
+      <figure data-s="1"><div class="card"><img src="${demoAppeals}" alt="Экран апелляций"></div><figcaption>Апелляция: ${esc(facts.architecture.nodes.find((n) => n.id === 'appeal')!.sub)}</figcaption></figure>
+      <figure data-s="2"><div class="card"><img src="${demoChecklists}" alt="Редактор чек-листа с весами"></div><figcaption>${esc(facts.ours[2])}</figcaption></figure>
+    </div>`,
+  notes: 'Апелляция проходит три слоя: модель, решение, финал. Чек-лист редактируется в интерфейсе и компилируется в промпт и JSON-схему, новый критерий добавляется без кода.',
+}
 
-export const meta = { research, criterion, node, journey, EASE_SNAP }
+export const slides: Slide[] = [sTitle, sBias, sGoal, sCatch, sLocal, sCloud, sArch, sRu014, sRu015, sJudges, rTable, rCall, rNA, rLimits, rAppeals]
+
+export const meta = { EASE_IO }

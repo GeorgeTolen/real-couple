@@ -3,39 +3,164 @@
   "headline": {
     "holdout_accuracy_pct": 97.2,
     "holdout_note": "10 новых чатов, эталон зафиксирован до прогона, 69 из 71 ответа",
-    "holdout_mae_points": 4.30,
+    "holdout_mae_points": 4.3,
     "calibration_accuracy_pct": 98.9,
     "stability_pct": 99.0,
     "usd_per_dialog": 0.021,
     "seconds_10_chats": "83 до 360",
     "dialogs_dev": 65,
-    "languages": ["RU", "KZ", "EN"],
+    "languages": [
+      "RU",
+      "KZ",
+      "EN"
+    ],
     "models_tested": 16,
     "tests_backend": "96 из 96",
     "review_flags": "1 из 65"
   },
   "architecture": {
     "nodes": [
-      {"id": "api", "label": "API организаторов", "sub": "чаты и звонки"},
-      {"id": "norm", "label": "Нормализация", "sub": "номера реплик, время, дубли ASR"},
-      {"id": "signals", "label": "Факты кодом", "sub": "кто ответил первым, паузы, SLA 3 мин"},
-      {"id": "compile", "label": "Чек-лист → промпт", "sub": "JSON-схема из настроек"},
-      {"id": "judgeA", "label": "Судья A", "sub": "Gemini 3.8 Flash"},
-      {"id": "judgeB", "label": "Судья B", "sub": "GPT-6.1 Sol"},
-      {"id": "check", "label": "Проверка согласованности", "sub": "нет сбоя, нет снижения"},
-      {"id": "arbiter", "label": "Арбитр", "sub": "Gemini 4 Argon, только спорное"},
-      {"id": "score", "label": "Баллы кодом", "sub": "N/A → перераспределение, округление"},
-      {"id": "ui", "label": "Карточка", "sub": "октагон, доказательства, плеер"},
-      {"id": "appeal", "label": "Апелляция", "sub": "модель → решение → финал"},
-      {"id": "export", "label": "results.json", "sub": "commit и push"}
+      {
+        "id": "api",
+        "label": "API организаторов",
+        "sub": "чаты и звонки"
+      },
+      {
+        "id": "norm",
+        "label": "Нормализация",
+        "sub": "номера реплик, время, дубли ASR"
+      },
+      {
+        "id": "signals",
+        "label": "Факты кодом",
+        "sub": "кто ответил первым, паузы, SLA 3 мин"
+      },
+      {
+        "id": "compile",
+        "label": "Чек-лист → промпт",
+        "sub": "JSON-схема из настроек"
+      },
+      {
+        "id": "judgeA",
+        "label": "Судья A",
+        "sub": "Gemini 3.8 Flash"
+      },
+      {
+        "id": "judgeB",
+        "label": "Судья B",
+        "sub": "GPT-6.1 Sol"
+      },
+      {
+        "id": "check",
+        "label": "Проверка согласованности",
+        "sub": "нет сбоя, нет снижения"
+      },
+      {
+        "id": "arbiter",
+        "label": "Арбитр",
+        "sub": "Gemini 4 Argon, только спорное"
+      },
+      {
+        "id": "score",
+        "label": "Баллы кодом",
+        "sub": "N/A → перераспределение, округление"
+      },
+      {
+        "id": "ui",
+        "label": "Карточка",
+        "sub": "октагон, доказательства, плеер"
+      },
+      {
+        "id": "appeal",
+        "label": "Апелляция",
+        "sub": "модель → решение → финал"
+      },
+      {
+        "id": "export",
+        "label": "results.json",
+        "sub": "commit и push"
+      }
     ],
-    "edges": [["api","norm"],["norm","signals"],["signals","compile"],["compile","judgeA"],["compile","judgeB"],["judgeA","check"],["judgeB","check"],["check","arbiter"],["check","score"],["arbiter","score"],["score","ui"],["ui","appeal"],["appeal","score"],["score","export"]],
+    "edges": [
+      [
+        "api",
+        "norm"
+      ],
+      [
+        "norm",
+        "signals"
+      ],
+      [
+        "signals",
+        "compile"
+      ],
+      [
+        "compile",
+        "judgeA"
+      ],
+      [
+        "compile",
+        "judgeB"
+      ],
+      [
+        "judgeA",
+        "check"
+      ],
+      [
+        "judgeB",
+        "check"
+      ],
+      [
+        "check",
+        "arbiter"
+      ],
+      [
+        "check",
+        "score"
+      ],
+      [
+        "arbiter",
+        "score"
+      ],
+      [
+        "score",
+        "ui"
+      ],
+      [
+        "ui",
+        "appeal"
+      ],
+      [
+        "appeal",
+        "score"
+      ],
+      [
+        "score",
+        "export"
+      ]
+    ],
     "local_mode": "Тот же код, судья Gemma 4 26B-A4B через Ollama"
   },
   "na_example": {
     "dialog": "p1-ru-020",
-    "weights": {"Контакт": 10, "Потребность": 15, "Идентификация": 20, "Консультация": 20, "Эмпатия": 15, "Ведение": 15, "Завершение": 5},
-    "answers": {"Контакт": "Да", "Потребность": "N/A", "Идентификация": "N/A", "Консультация": "20 из 20", "Эмпатия": "Да", "Ведение": "10 из 10", "Завершение": "Нет"},
+    "weights": {
+      "Контакт": 10,
+      "Потребность": 15,
+      "Идентификация": 20,
+      "Консультация": 20,
+      "Эмпатия": 15,
+      "Ведение": 15,
+      "Завершение": 5
+    },
+    "answers": {
+      "Контакт": "Да",
+      "Потребность": "N/A",
+      "Идентификация": "N/A",
+      "Консультация": "20 из 20",
+      "Эмпатия": "Да",
+      "Ведение": "10 из 10",
+      "Завершение": "Нет"
+    },
     "applicable_weight": 65,
     "earned": 60,
     "total": 92.31,
@@ -52,5 +177,167 @@
     "Звонки: дубли ASR, маски персональных данных, локальный Whisper",
     "Октагон, паспорт критерия, карта диалогов с эталоном чек-листа",
     "Интерфейс в стиле Dynamics 365, один HTML-файл"
-  ]
+  ],
+  "trust": {
+    "_about": "Посчитано из bench/holdout/holdout_report.json (контроль, 10 чатов) и bench/results_ensemble.json (повтор на 12 DEV-чатах). Каппа Коэна по уверенным пунктам, скрипт в docs/pitch/SLIDE_trust.md.",
+    "kappa_holdout": 0.962,
+    "human_ceiling_kappa": 0.8,
+    "judge_agreement": "78 из 80",
+    "arbitrated": 2,
+    "stability": "95 из 96",
+    "stability_change": "p1-en-015/c5: N и Y",
+    "confident_items": 71,
+    "disputed_items": 9,
+    "c4_holdout": "7 из 7",
+    "c2_holdout": "6 из 8",
+    "c2_holdout_pct": 75,
+    "kz_holdout": "21 из 21",
+    "holdout_dialogs": 10,
+    "etalon": [
+      "Чек-лист Freedom и официальные ответы организаторов из чата 07.11",
+      "Контрольные чаты и эталон закоммичены до первого запуска моделей, дата в git",
+      "Подсказки после прогона не менялись"
+    ]
+  },
+  "word_example": {
+    "_about": "Реплики дословно из data/dev.json, оценки и номера реплик из results/dev/results.json.",
+    "left": {
+      "dialog": "p1-ru-014",
+      "total": 38.13,
+      "turns": [
+        {
+          "n": 10,
+          "who": "оператор",
+          "text": "Привет, где именно ищете?"
+        },
+        {
+          "n": 11,
+          "who": "клиент",
+          "text": "Я уже писал, на сайте компании, не в приложении."
+        },
+        {
+          "n": 12,
+          "who": "оператор",
+          "text": "Понял. Это информационный сайт. Для доступа к счёту откройте tradernet.global или мобильное приложение Freedom Broker."
+        }
+      ],
+      "verdicts": [
+        {
+          "turns": [
+            10
+          ],
+          "criterion": "Контакт",
+          "value": "Нет",
+          "why": "«Привет», имени нет",
+          "kind": "no"
+        },
+        {
+          "turns": [
+            10
+          ],
+          "criterion": "Ведение",
+          "value": "7",
+          "why": "повторный вопрос о том, что клиент уже сказал",
+          "kind": "mid"
+        },
+        {
+          "turns": [
+            11,
+            12
+          ],
+          "criterion": "Эмпатия",
+          "value": "Нет",
+          "why": "«Понял» в ответ на раздражение",
+          "kind": "no"
+        }
+      ]
+    },
+    "right": {
+      "dialog": "p1-ru-015",
+      "total": 92.31,
+      "turns": [
+        {
+          "n": 10,
+          "who": "оператор",
+          "text": "Здравствуйте, меня зовут Дина. Да, использованный ранее логин остаётся в системе и после закрытия счёта. Для новой регистрации используйте другой."
+        },
+        {
+          "n": 11,
+          "who": "клиент",
+          "text": "То есть ждать, пока освободится, не надо?"
+        },
+        {
+          "n": 12,
+          "who": "оператор",
+          "text": "Для регистрации сейчас выберите другой логин. Спасибо за обращение, до свидания!"
+        }
+      ],
+      "verdicts": [
+        {
+          "turns": [
+            10
+          ],
+          "criterion": "Контакт",
+          "value": "Да",
+          "why": "поздоровалась и назвала имя",
+          "kind": "yes"
+        },
+        {
+          "turns": [
+            11,
+            12
+          ],
+          "criterion": "Консультация",
+          "value": "15 из 20",
+          "why": "на уточнение нет прямого ответа",
+          "kind": "mid"
+        }
+      ]
+    },
+    "kz": {
+      "dialog": "p1-kz-008",
+      "total": 38.13
+    }
+  },
+  "instability": {
+    "_about": "docs/stage3-report.md (раздел про PROMPT_stage3_fix1) и journey.json, шаг 08.11 00:09.",
+    "dialog": "p1-en-006",
+    "criterion": "Ведение диалога",
+    "scale": [
+      10,
+      7,
+      4,
+      0
+    ],
+    "runs": [
+      {
+        "judge_a": 10,
+        "judge_b": 7,
+        "arbiter": 10,
+        "total": 85.0
+      },
+      {
+        "judge_a": 10,
+        "judge_b": 7,
+        "arbiter": 7,
+        "total": 80.5
+      }
+    ],
+    "evidence": "#16 и #19",
+    "fixes": [
+      "Кеш: тот же текст и чек-лист дают тот же ответ без нового вызова",
+      "Арбитр обязателен при любом споре по шкале",
+      "Нет сбоя с номером реплики, нет снижения"
+    ]
+  },
+  "limits": {
+    "_about": "results/dev/results.json (65 диалогов DEV, версия чек-листа 5); bench/holdout/holdout_report.json; правило про прощание: docs/pitch/PITCH_analysis.md, раздел 6.",
+    "cluster_92_31": "29 из 65",
+    "cluster_reason": "только прощание = Нет по завершению",
+    "closure_rule_dependent": "44 из 65",
+    "closure_rule_only_drop": "28 из 44",
+    "closure_freedom_answer": "на ваше усмотрение",
+    "closure_freedom_answer_at": "08.11 9:17",
+    "closure_our_reading": "читаем чек-лист буквально: подвёл итог или предложил помощь и попрощался"
+  }
 }

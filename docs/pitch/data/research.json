@@ -28,6 +28,13 @@
         "title": "LLM-as-judge: A complete guide to evaluation best practices in March 2026",
         "by": "Openlayer",
         "where": "30.03.2026"
+      },
+      "bias": {
+        "name": "Один вендор",
+        "line": "Один судья систематически смещён",
+        "chips": [
+          "Openlayer 2026"
+        ]
       }
     },
     {
@@ -36,7 +43,38 @@
       "url": "https://aclanthology.org/2026.findings-emnlp.1444.pdf",
       "quote": "model-specific position bias",
       "gist_ru": "Порядок ступеней шкалы сдвигает выбор модели, и у каждой модели по-своему.",
-      "applied": "Два судьи разных семейств плюс правило «нет сбоя, нет снижения» для шкальных критериев."
+      "applied": "Два судьи разных семейств плюс правило «нет сбоя, нет снижения» для шкальных критериев.",
+      "bias": {
+        "name": "Позиционный",
+        "line": "Порядок ступеней шкалы и вариантов сдвигает ответ",
+        "chips": [
+          "EMNLP 2026",
+          "arXiv 2305.17926"
+        ]
+      }
+    },
+    {
+      "id": "wang",
+      "source": "Wang et al., Large Language Models are not Fair Evaluators (arXiv 2305.17926, 2023)",
+      "url": "https://arxiv.org/abs/2305.17926",
+      "quote": null,
+      "gist_ru": "В парном сравнении судья меняет вердикт, если поменять ответы A и B местами.",
+      "applied": "Два судьи разных семейств; спор решает арбитр, а не порядок."
+    },
+    {
+      "id": "zheng",
+      "source": "Zheng et al., Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena (arXiv 2306.05685, NeurIPS 2023)",
+      "url": "https://arxiv.org/abs/2306.05685",
+      "quote": null,
+      "gist_ru": "Судья предпочитает длинный и гладкий ответ, даже если он не точнее (verbosity bias).",
+      "applied": "Без номера реплики снижения нет; балл считает код.",
+      "bias": {
+        "name": "На длину",
+        "line": "Длинный и гладкий ответ нравится судье больше",
+        "chips": [
+          "arXiv 2306.05685"
+        ]
+      }
     },
     {
       "id": "consistent_wrong",
@@ -50,6 +88,13 @@
         "title": "Who Judges the Judge? A Data Story on 541,000 LLM-Judge Decisions and an Annotator-Pool Audit",
         "by": "Kili Technology",
         "where": "16.10.2026"
+      },
+      "bias": {
+        "name": "Стабильно, но неверно",
+        "line": "Повторяет ответ и расходится с экспертами",
+        "chips": [
+          "Kili 2026"
+        ]
       }
     },
     {
@@ -58,7 +103,14 @@
       "url": "https://arxiv.org/html/2510.09738v1",
       "quote": null,
       "gist_ru": "Лучшие LLM-судьи согласуются с людьми на уровне kappa 0,78 до 0,82, а люди между собой около 0,80. Потолок задачи это согласие экспертов.",
-      "applied": "Цель не 100%, а уровень эксперта: обоснованная оценка и честный флаг сомнения."
+      "applied": "Цель не 100%, а уровень эксперта: обоснованная оценка и честный флаг сомнения.",
+      "bias": {
+        "name": "Потолок людей",
+        "line": "Эксперты между собой согласны на κ ≈ 0,80",
+        "chips": [
+          "arXiv 2510.09738"
+        ]
+      }
     },
     {
       "id": "facts",
@@ -72,6 +124,13 @@
         "title": "Learning to Judge: LLMs Designing and Applying Evaluation Rubrics",
         "by": "Siro, Aliannejadi, Aliannejadi",
         "where": "аннотация"
+      },
+      "bias": {
+        "name": "Факты",
+        "line": "Хуже всего оценивает фактическую правильность",
+        "chips": [
+          "arXiv 2602.08672"
+        ]
       }
     },
     {

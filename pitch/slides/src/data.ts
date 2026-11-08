@@ -39,7 +39,7 @@ const NAMES: Record<string, string> = {
   'openai/gpt-oss-20b': 'gpt-oss-20b',
   'ibm-granite/granite-4.2-8b': 'Granite 4.2 8B',
   'mistralai/ministral-8b-2512': 'Ministral 8B',
-  'qwen/qwen3.5-9b': 'Qwen3.5 9B',
+  'qwen/qwen3.5-9b': 'Qwen 3.5 9B',
 }
 
 export function modelName(id: string): string {
@@ -80,6 +80,9 @@ export function node(id: string) {
 }
 
 export const REPO_URL = 'https://github.com/GeorgeTolen/real-couple'
+
+/** Кнопка «Живое демо» на слайде 10: главная страница приложения (`#/`). Поменяйте адрес, если демо поднято не на localhost:8000. */
+export const DEMO_URL = 'http://localhost:8000/#/'
 
 /** Крупное моноширинное число: запятая без широких полей знакоместа. */
 export function tight(text: string): string {
