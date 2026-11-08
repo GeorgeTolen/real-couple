@@ -1,0 +1,118 @@
+{
+  "_about": "Источники, на которые опирается решение. quote: дословно, не длиннее 15 слов, одна цитата на источник. gist_ru: вывод своими словами. applied: что мы сделали.",
+  "items": [
+    {
+      "id": "cot",
+      "source": "Soumik, Judging the Judges: A Systematic Evaluation of Bias Mitigation Strategies in LLM-as-a-Judge Pipelines (arXiv 2604.23178v2, 2026)",
+      "url": "https://arxiv.org/html/2604.23178",
+      "quote": "Explicit step-by-step analysis required before the model emits the verdict field.",
+      "gist_ru": "Пошаговый анализ до вердикта и рубрика повышают согласие судьи с людьми. Самый большой прирост у Claude дала связка CoT и рубрики с перестановкой: +11,5 п.п.",
+      "applied": "JSON каждого критерия: номера реплик → рассуждение → ответ. Ступени шкалы с описаниями из чек-листа.",
+      "clip": {
+        "site": "arXiv:2604.23178v2",
+        "title": "Judging the Judges: A Systematic Evaluation of Bias Mitigation Strategies in LLM-as-a-Judge Pipelines",
+        "by": "Sadman Kabir Soumik",
+        "where": "раздел 3.3, стратегия S5"
+      },
+      "note": "Прежняя цитата «Ask for the reasoning first, then the verdict» взята из разбора Grepture, в самой статье её нет. Заменена 08.11.2026 на формулировку статьи. В статье +11,5 п.п. (Claude, S8), у Grepture +11,2."
+    },
+    {
+      "id": "panel",
+      "source": "Openlayer, LLM-as-judge best practices (март 2026)",
+      "url": "https://www.openlayer.com/blog/llm-as-judge-evaluation-guide",
+      "quote": "cross-validate with a second model from a different provider",
+      "gist_ru": "Один судья систематически смещён. Второй судья другого вендора ловит его перекосы.",
+      "applied": "Судья A Gemini 3.8 Flash и судья B GPT-6.1 Sol, разные вендоры. Арбитр Gemini 4 Argon только по спорным критериям.",
+      "clip": {
+        "site": "openlayer.com",
+        "title": "LLM-as-judge: A complete guide to evaluation best practices in March 2026",
+        "by": "Openlayer",
+        "where": "30.03.2026"
+      }
+    },
+    {
+      "id": "position",
+      "source": "Position Bias in Rubric-Based LLM-as-a-Judge (Findings of EMNLP 2026)",
+      "url": "https://aclanthology.org/2026.findings-emnlp.1444.pdf",
+      "quote": "model-specific position bias",
+      "gist_ru": "Порядок ступеней шкалы сдвигает выбор модели, и у каждой модели по-своему.",
+      "applied": "Два судьи разных семейств плюс правило «нет сбоя, нет снижения» для шкальных критериев."
+    },
+    {
+      "id": "consistent_wrong",
+      "source": "Kili Technology, Who judges the judge (2026)",
+      "url": "https://kili-technology.com/blog/data-story-who-judges-the-judge-llm-as-a-judge",
+      "quote": "consistent and wrong",
+      "gist_ru": "Судья может стабильно повторять ответ и при этом расходиться с экспертами. Сырое совпадение завышает качество на 33 до 41 п.п.",
+      "applied": "Меряем отдельно точность против эталона и стабильность повтора. Эталон контрольной выборки зафиксирован до прогона.",
+      "clip": {
+        "site": "kili-technology.com",
+        "title": "Who Judges the Judge? A Data Story on 541,000 LLM-Judge Decisions and an Annotator-Pool Audit",
+        "by": "Kili Technology",
+        "where": "16.10.2026"
+      }
+    },
+    {
+      "id": "ceiling",
+      "source": "Judge's Verdict, NVIDIA (arXiv 2510.09738)",
+      "url": "https://arxiv.org/html/2510.09738v1",
+      "quote": null,
+      "gist_ru": "Лучшие LLM-судьи согласуются с людьми на уровне kappa 0,78 до 0,82, а люди между собой около 0,80. Потолок задачи это согласие экспертов.",
+      "applied": "Цель не 100%, а уровень эксперта: обоснованная оценка и честный флаг сомнения."
+    },
+    {
+      "id": "facts",
+      "source": "Learning to Judge, GER-Eval (arXiv 2602.08672)",
+      "url": "https://www.alphaxiv.org/abs/2602.08672",
+      "quote": "scoring reliability degrades in factual and knowledge-intensive settings",
+      "gist_ru": "Хуже всего модели оценивают фактическую правильность. У нас это критерий «Консультация»: 72% по всем моделям.",
+      "applied": "Подсказка критерия: не придумывать факты о продуктах, оценивать логику и полноту, писать, что факт не проверялся.",
+      "clip": {
+        "site": "arXiv:2602.08672",
+        "title": "Learning to Judge: LLMs Designing and Applying Evaluation Rubrics",
+        "by": "Siro, Aliannejadi, Aliannejadi",
+        "where": "аннотация"
+      }
+    },
+    {
+      "id": "industry",
+      "source": "Level AI, Quality Assurance",
+      "url": "https://thelevel.ai/quality-assurance",
+      "quote": "transparent scores with supporting evidence and reasoning",
+      "gist_ru": "Индустриальный стандарт Auto-QA: оценка всегда с доказательством, условный N/A, споры и калибровка.",
+      "applied": "Номер реплики у каждого вывода, переход к фрагменту, апелляции с тремя слоями: модель, решение, финал."
+    },
+    {
+      "id": "confidence",
+      "source": "Kore.ai Quality AI",
+      "url": "https://docs.kore.ai/xo/quality-ai/about-quality-ai",
+      "quote": "Flag low-confidence scores for human review.",
+      "gist_ru": "Человек смотрит только спорное, а не всё подряд.",
+      "applied": "Флаг «На проверку» только когда арбитр не согласился ни с одним судьёй: 1 диалог из 65."
+    },
+    {
+      "id": "kazakh",
+      "source": "Left Behind: cross-lingual transfer for low-resource languages (arXiv 2603.21036) и KazMMLU (ACL 2025)",
+      "url": "https://arxiv.org/html/2603.21036v1",
+      "quote": null,
+      "gist_ru": "Казахский язык недопредставлен в LLM, качество на нём заметно ниже. Выбирать модель нужно с отдельной проверкой KZ.",
+      "applied": "Казахские чаты в эталоне. Gemini 3.8 Flash: 100% на KZ."
+    },
+    {
+      "id": "coverage",
+      "source": "MiaRec, CX Today",
+      "url": "https://cxtoday.com/the-evolution-of-contact-center-quality-management-miarec",
+      "quote": null,
+      "gist_ru": "При ручном контроле QA-команды успевают оценить лишь 2 до 3% звонков.",
+      "applied": "Автооценка 100% диалогов за $0,021 на диалог."
+    },
+    {
+      "id": "freedom",
+      "source": "Freedom Broker, Q&A хакатона, 07.11.2026",
+      "url": null,
+      "quote": "осмысленно анализирует диалоги, применяет заданный чек-лист и выдаёт логичные, обоснованные оценки",
+      "gist_ru": "Заказчик ждёт обоснованность и воспроизводимость, а не угадывание методики.",
+      "applied": "Официальные трактовки из чата в подсказках критериев, а не в коде."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "cqa-pitch-slides",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "qr": "node scripts/qr.mjs",
+    "assets": "python scripts/prepare_assets.py",
+    "build": "node scripts/qr.mjs && tsc --noEmit && vite build",
+    "export": "node scripts/export.mjs",
+    "check": "node scripts/check.mjs",
+    "all": "npm run build && npm run export && npm run check"
+  },
+  "dependencies": {
+    "@fontsource-variable/geologica": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/onest": "^5.3.1",
+    "@fontsource-variable/source-serif-4": "^5.3.1",
+    "@fontsource-variable/unbounded": "^5.3.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "playwright": "^1.65.0",
+    "qrcode": "^1.5.4",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}
